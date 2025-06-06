@@ -1,0 +1,1 @@
+sensorTypes = ["temperature", "voltage", "humidity"]

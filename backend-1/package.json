@@ -1,0 +1,51 @@
+{
+  "name": "4.23",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"nodemon --legacy-watch server.js --ignore src/open-api/*.json --ignore src/open-api/*.yaml\" \"nodemon --legacy-watch realtime-server.js\" \"node src/socket/socketPublisher.js\" \"node src/ultis/genSwagger.js\"",
+    "dev": "concurrently \"nodemon --legacy-watch server.js --ignore src/open-api/*.json --ignore src/open-api/*.yaml\" \"nodemon --legacy-watch realtime-server.js\" \"node src/socket/socketPublisher.js\" \"node src/ultis/genSwagger.js\""
+  },
+  "author": "4.23",
+  "license": "ISC",
+  "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
+    "bcrypt": "^5.1.1",
+    "concurrently": "^9.1.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^4.18.2",
+    "express-async-errors": "^3.1.1",
+    "js-yaml": "^4.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "lint": "^0.8.19",
+    "lodash": "^4.17.21",
+    "module-alias": "^2.2.3",
+    "mongodb": "^6.16.0",
+    "mongoose": "^7.6.11",
+    "redis": "^5.5.5",
+    "socket.io": "^4.8.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "vite": "^5.2.8"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.32.2",
+    "install": "^0.13.0",
+    "jest": "^29.7.0",
+    "nodemon": "^2.0.22",
+    "npm": "^9.8.1",
+    "supertest": "^6.3.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "globalTeardown": "./tests/teardown.js"
+  },
+  "_moduleAliases": {
+    "@": "src",
+    "@public": "public"
+  }
+}
