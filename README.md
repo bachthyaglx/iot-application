@@ -11,7 +11,8 @@
 - [ ] Backend data of menu sidebar
 - [ ] Test other data on menu sidebar
 - [ ] Test app locally (npm + Docker)
-- [ ] Test deployment on Kubernetes 
+- [ ] Test deployment on Kubernetes (depl/ingr/svc + Prometheus + Grafana)
+- [ ] Production 
 
 ### Architect used:
 * Keep REST/OpenAPI for static + control logic
