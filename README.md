@@ -1,16 +1,16 @@
 ### Todo list:
 
-[] Dynamic table with vertical scale
-[] Backend data of general information
-[] Backend data of image/pic
-[] Frontend fetching data and CSS for main page
-[] Authentication & Authorization 
-[] Menu sidebar displayed when signed-in
-[] Dynamic list contents for menu sidebar
-[] Backend data of menu sidebar
-[] Test other data on menu sidebar
-[] Test app locally (npm + Docker)
-[] Test deployment on Kubernetes 
+- [ ] Dynamic table with vertical scale
+- [ ] Backend data of general information
+- [ ] Backend data of image/pic
+- [ ] Frontend fetching data and CSS for main page
+- [ ] Authentication & Authorization 
+- [ ] Menu sidebar displayed when signed-in
+- [ ] Dynamic list contents for menu sidebar
+- [ ] Backend data of menu sidebar
+- [ ] Test other data on menu sidebar
+- [ ] Test app locally (npm + Docker)
+- [ ] Test deployment on Kubernetes 
 
 ### Architect used:
 * Keep REST/OpenAPI for static + control logic
