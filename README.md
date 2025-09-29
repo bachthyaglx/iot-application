@@ -1,5 +1,6 @@
 ### Todo list:
 
+- [x] React + Vite + TypeScript + Material-UI libraries initialization
 - [ ] Dynamic table with vertical scale
 - [ ] Backend data of general information
 - [ ] Backend data of image/pic
