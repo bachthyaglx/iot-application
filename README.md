@@ -1,12 +1,12 @@
 ### Todo list:
 
 - [x] React + Vite + TypeScript + Material-UI libraries initialization
-- [ ] Dynamic table with vertical scale
-- [ ] Backend data of general information
-- [ ] Backend data of image/pic
+- [x] Dynamic table with vertical scale
+- [x] Backend data of general information
+- [x] Backend data of image/pic
 - [ ] Frontend fetching data and CSS for main page
 - [ ] Authentication & Authorization 
-- [ ] Menu sidebar displayed when signed-in
+- [ ] Dynamic sidebar when sign-in
 - [ ] Dynamic list contents for menu sidebar
 - [ ] Backend data of menu sidebar
 - [ ] Test other data on menu sidebar
