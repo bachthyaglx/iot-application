@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "concurrently \"nodemon --legacy-watch server.js --ignore src/open-api/*.json --ignore src/open-api/*.yaml\" \"nodemon --legacy-watch realtime-server.js\" \"node src/socket/socketPublisher.js\" \"node src/ultis/genSwagger.js\"",
-    "dev": "concurrently \"nodemon --legacy-watch server.js --ignore src/open-api/*.json --ignore src/open-api/*.yaml\" \"nodemon --legacy-watch realtime-server.js\" \"node src/socket/socketPublisher.js\" \"node src/ultis/genSwagger.js\""
+    "start": "concurrently \"nodemon --legacy-watch server.js --ignore src/open-api/*.json --ignore src/open-api/*.yaml\" \"nodemon --legacy-watch realtime-server.js\" \"node src/socket/socketPublisher.js\" \"node src/utils/genSwagger.js\"",
+    "dev": "concurrently \"nodemon --legacy-watch server.js --ignore src/open-api/*.json --ignore src/open-api/*.yaml\" \"nodemon --legacy-watch realtime-server.js\" \"node src/socket/socketPublisher.js\" \"node src/utils/genSwagger.js\""
   },
   "author": "4.23",
   "license": "ISC",
@@ -24,6 +24,7 @@
     "module-alias": "^2.2.3",
     "mongodb": "^6.16.0",
     "mongoose": "^7.6.11",
+    "multer": "^2.0.2",
     "redis": "^5.5.5",
     "socket.io": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",

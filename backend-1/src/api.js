@@ -1,4 +1,5 @@
 /* eslint-disable linebreak-style */
+/* ./src/api.js */
 const router = require('express').Router()
 const middleware = require('./utils/middleware')
 const root = require('./controllers/rootController')
@@ -7,15 +8,15 @@ const info = require('./controllers/deviceInfoController')
 const data = require('./controllers/dataController')
 const auth = require('./controllers/authController')
 
-// Public GET routes
-router.get('/', middleware.userExtractor, root.getRoot)
+// Public routes - NO need token
+router.get('/', middleware.tokenExtractor, middleware.optionalUserExtractor, root.getRoot)
 router.get('/picture', picture.getPicture)
-router.get('/information', info.getInformation)
-router.get('/data', middleware.userExtractor, data.getRealTimeData)
+router.get('/identification', info.getInformation)
 
-// Protected PUT routes
-router.put('/picture', middleware.userExtractor, picture.updatePicture)
-router.put('/information', middleware.userExtractor, info.updateDevice)
+// Protected routes - need token
+router.put('/picture', middleware.tokenExtractor, middleware.userExtractor, picture.uploadMiddleware, picture.updatePicture)
+router.put('/identification', middleware.tokenExtractor, middleware.userExtractor, info.updateDevice)
+router.get('/data', middleware.tokenExtractor, middleware.optionalUserExtractor, data.getRealTimeData)
 
 // Auth routes
 router.post('/login', auth.login)

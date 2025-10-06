@@ -21,10 +21,10 @@ const errorHandler = (error, request, response, next) => {
   if (error.name === 'CastError') {
     return response.status(400).send({ error: 'malformatted id' })
   } else if (error.name === 'ValidationError') {
-    return response.status(400).json({ error: 'Username and password must be at least 3 characters'})
+    return response.status(400).json({ error: 'Username and password must be at least 3 characters' })
   } else if (error.name === 'MongoServerError' && error.message.includes('E11000 duplicate key error')) {
     return response.status(400).json({ error: 'expected `username` to be unique' })
-  } else if (error.name ===  'JsonWebTokenError') {
+  } else if (error.name === 'JsonWebTokenError') {
     return response.status(400).json({ error: 'token missing or invalid' })
   }
 
@@ -40,6 +40,7 @@ const tokenExtractor = (request, response, next) => {
   next()
 }
 
+// Compulsory Middleware - need token (for protected routes)
 const userExtractor = async (request, response, next) => {
   const token = request.token;
 
@@ -65,10 +66,38 @@ const userExtractor = async (request, response, next) => {
   }
 };
 
+// Public routes that NO need token
+const optionalUserExtractor = async (request, response, next) => {
+  const token = request.token;
+
+  // if no token, continue as guest (user = null)
+  if (!token) {
+    request.user = null;
+    return next();
+  }
+
+  try {
+    const decodedToken = jwt.verify(token, process.env.SECRET);
+    if (!decodedToken.id) {
+      request.user = null;
+      return next();
+    }
+
+    const user = await User.findById(decodedToken.id);
+    request.user = user || null;
+    next();
+  } catch (err) {
+    // if token invalid or expired, continue as guest (user = null)
+    request.user = null;
+    next();
+  }
+};
+
 module.exports = {
   requestLogger,
   unknownEndpoint,
   errorHandler,
   tokenExtractor,
-  userExtractor
+  userExtractor,
+  optionalUserExtractor
 }

@@ -44,35 +44,85 @@
  *       500:
  *         description: Failed to update or re-send image
  */
-const path = require('path')
+const multer = require('multer')
 const { client } = require('../utils/redisClient')
+const Picture = require('../models/picture')
 
-const imagePath = path.join(__dirname, '../../public/device-1.jpg')
 const CACHE_KEY = 'pictureMeta'
+const CACHE_KEY_DATA = 'pictureData'
+
+// Multer config to upload image to memory
+const storage = multer.memoryStorage()
+
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true)
+    } else {
+      cb(new Error('Only image files are allowed'))
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+})
 
 const getPicture = async (req, res) => {
-  const meta = await client.get(CACHE_KEY)
+  try {
+    let query = {}
+    if (req.user && req.user._id) {
+      query.user = req.user._id
+    }
+    const picture = await Picture.findOne(query)
 
-  if (meta) {
-    const parsed = JSON.parse(meta)
-    console.log('Using cached metadata:', parsed)
-    res.set('X-Image-Content-Type', parsed.contentType)
-  } else {
-    const newMeta = { filename: 'device-1.jpg', contentType: 'image/jpeg' }
-    await client.set(CACHE_KEY, JSON.stringify(newMeta), { EX: 86400 })
-    res.set('X-Image-Content-Type', newMeta.contentType)
+    if (!picture) {
+      return res.status(404).json({ error: 'No picture found' })
+    }
+
+    res.set('Content-Type', picture.contentType)
+    res.send(picture.data)
+  } catch (error) {
+    console.error('Error getting picture:', error)
+    res.status(500).json({ error: 'Failed to retrieve image' })
   }
-
-  res.sendFile(imagePath)
 }
 
 const updatePicture = async (req, res) => {
-  await client.del(CACHE_KEY)
-  console.log('✅ Picture metadata cache cleared')
-  res.sendFile(imagePath)
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' })
+    }
+
+    // Save or update picture in MongoDB
+    const picture = await Picture.findOneAndUpdate(
+      { user: req.user._id },
+      {
+        filename: req.file.originalname,
+        contentType: req.file.mimetype,
+        data: req.file.buffer,
+        user: req.user._id
+      },
+      { new: true, upsert: true }
+    )
+
+    // Clear cache
+    await client.del(CACHE_KEY)
+    await client.del(CACHE_KEY_DATA)
+
+    console.log('✅ Picture cache cleared')
+    console.log('✅ New picture uploaded:', req.file.originalname)
+
+    res.json({
+      message: 'Picture updated successfully',
+      id: picture.id
+    })
+  } catch (error) {
+    console.error('Error updating picture:', error)
+    res.status(500).json({ error: 'Failed to update picture' })
+  }
 }
 
 module.exports = {
   getPicture,
-  updatePicture
+  updatePicture,
+  uploadMiddleware: upload.single('picture')
 }

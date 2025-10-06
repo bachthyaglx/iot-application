@@ -80,16 +80,18 @@ const getRoot = async (req, res) => {
     security: 'basic_sc',
     links: isAuthenticated
       ? [
-          { href: '/information', rel: 'information', method: 'GET' },
-          { href: '/picture', rel: 'picture', method: 'GET' },
-          { href: '/data', rel: 'data', method: 'GET' },
-          { href: '/logout', rel: 'logout', method: 'POST' }
-        ]
+        { href: '/information', rel: 'information', method: 'GET' },
+        { href: '/information', rel: 'information', method: 'PUT' },
+        { href: '/picture', rel: 'picture', method: 'GET' },
+        { href: '/picture', rel: 'picture', method: 'PUT' },
+        { href: '/data', rel: 'data', method: 'GET' },
+        { href: '/logout', rel: 'logout', method: 'POST' }
+      ]
       : [
-          { href: '/identification', rel: 'identification', method: 'GET' },
-          { href: '/picture', rel: 'picture', method: 'GET' },
-          { href: '/login', rel: 'login', method: 'POST' }
-        ]
+        { href: '/identification', rel: 'identification', method: 'GET' },
+        { href: '/picture', rel: 'picture', method: 'GET' },
+        { href: '/login', rel: 'login', method: 'POST' }
+      ]
   }
 
   res.json(data)

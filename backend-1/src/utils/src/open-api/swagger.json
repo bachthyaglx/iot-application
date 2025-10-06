@@ -1,0 +1,363 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "IoT API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/login": {
+      "post": {
+        "summary": "User login",
+        "description": "Authenticates a user and returns a JWT token.",
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "example": "admin"
+                  },
+                  "password": {
+                    "type": "string",
+                    "example": "secret123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful login, returns JWT token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "username": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid username or password"
+          }
+        }
+      }
+    },
+    "/api/logout": {
+      "post": {
+        "summary": "User logout",
+        "description": "Logs out the user (client should discard the token manually).",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful logout message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Logged out (client must discard token)"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data": {
+      "get": {
+        "summary": "Get latest sensor data",
+        "description": "Returns the most recent values for temperature, voltage, humidity, etc.",
+        "tags": [
+          "Sensor"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON object with latest sensor values",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": {
+                    "temperature": {
+                      "value": 25.1,
+                      "timestamp": "2025-06-03T22:59:46.725Z",
+                      "type": "temperature"
+                    },
+                    "voltage": {
+                      "value": 230.5,
+                      "timestamp": "2025-06-03T22:59:46.725Z",
+                      "type": "voltage"
+                    },
+                    "humidity": {
+                      "value": 60.4,
+                      "timestamp": "2025-06-03T22:59:46.725Z",
+                      "type": "humidity"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/device-info": {
+      "get": {
+        "summary": "Get device information",
+        "description": "Returns basic information about the device. Data is cached in Redis for performance.",
+        "tags": [
+          "Device"
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON object containing device information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": {
+                    "name": "Device 1",
+                    "location": "Berlin",
+                    "type": "MVK Pro",
+                    "model": "A100",
+                    "status": "online"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update device information",
+        "description": "Updates the device information and invalidates Redis cache.",
+        "tags": [
+          "Device"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "example": {
+                  "name": "New Device Name",
+                  "location": "Hanoi",
+                  "model": "B200",
+                  "status": "offline"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated device information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": {
+                    "name": "New Device Name",
+                    "location": "Hanoi",
+                    "model": "B200",
+                    "status": "offline"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device not found"
+          },
+          "500": {
+            "description": "Failed to update device"
+          }
+        }
+      }
+    },
+    "/api/picture": {
+      "get": {
+        "summary": "Get device image",
+        "description": "Returns the device image file. Metadata is cached using Redis.",
+        "tags": [
+          "Picture"
+        ],
+        "responses": {
+          "200": {
+            "description": "JPEG image of the device",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to retrieve image"
+          }
+        },
+        "headers": {
+          "X-Image-Content-Type": {
+            "description": "Content type of the image",
+            "schema": {
+              "type": "string",
+              "example": "image/jpeg"
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Clear image cache and return device image",
+        "description": "Clears cached metadata for the image in Redis and re-sends the file.",
+        "tags": [
+          "Picture"
+        ],
+        "responses": {
+          "200": {
+            "description": "JPEG image re-sent after clearing cache",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update or re-send image"
+          }
+        }
+      }
+    },
+    "/api": {
+      "get": {
+        "summary": "Get Thing Description root metadata",
+        "description": "Returns metadata following W3C Web of Things Thing Description standard.\nResponse is dynamic depending on login status (`req.user`).\n",
+        "tags": [
+          "Root"
+        ],
+        "responses": {
+          "200": {
+            "description": "Thing Description metadata with available API links",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "context": {
+                      "type": "string",
+                      "example": "https://www.w3.org/2022/wot/td/v1.1"
+                    },
+                    "id": {
+                      "type": "string",
+                      "example": "http://localhost"
+                    },
+                    "title": {
+                      "type": "string",
+                      "example": "Sensor"
+                    },
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "instance": {
+                          "type": "string",
+                          "example": "1.0.0"
+                        },
+                        "model": {
+                          "type": "string",
+                          "example": "58841"
+                        }
+                      }
+                    },
+                    "created": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "security": {
+                      "type": "string",
+                      "example": "basic_sc"
+                    },
+                    "links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "href": {
+                            "type": "string",
+                            "example": "/information"
+                          },
+                          "rel": {
+                            "type": "string",
+                            "example": "information"
+                          },
+                          "method": {
+                            "type": "string",
+                            "example": "GET"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {},
+  "tags": [
+    {
+      "name": "Device",
+      "description": "Device information and metadata"
+    },
+    {
+      "name": "Picture",
+      "description": "APIs for fetching and updating the device image"
+    }
+  ]
+}
