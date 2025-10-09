@@ -4,7 +4,7 @@ import { AppBar, Toolbar, Typography, IconButton, Button, Tooltip } from '@mui/m
 import MenuIcon from '@mui/icons-material/Menu';
 import StorageIcon from '@mui/icons-material/Storage';
 import { useAuth } from '../contexts/AuthContext';
-import ServerDiscoveryDialog from './ServerDiscoveryDialog';
+import ServerDialog from './ServerDialog';
 import LoginDialog from './LoginDialog';
 
 interface HeaderProps {
@@ -65,7 +65,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, sidebarOpen, sidebarWi
       </AppBar>
 
       {/* Server Discovery Dialog */}
-      <ServerDiscoveryDialog
+      <ServerDialog
         open={serverDialogOpen}
         onClose={() => setServerDialogOpen(false)}
       />

@@ -54,12 +54,14 @@ const AppContent = () => {
   const { isLoggedIn } = useAuth();
 
   const { endpointData, serverInfo } = useAppSelector((state) => state.server);
-  const identificationData = endpointData['identification']?.data;
   const pictureData = endpointData['picture']?.data;
 
-  const displayData = identificationData
-    ? excludeFields(identificationData, [...COMMON_HIDDEN_FIELDS, 'user'])
-    : null;
+  // Filter GET endpoints (exclude picture)
+  const getEndpoints = Object.entries(endpointData).filter(
+    ([key, value]) => value.method === 'GET' && key !== 'picture'
+  );
+
+  const hasData = getEndpoints.length > 0;
 
   return (
     <>
@@ -83,8 +85,8 @@ const AppContent = () => {
           minHeight: 'calc(100vh - 64px)',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
           alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
         {!serverInfo && (
@@ -93,43 +95,76 @@ const AppContent = () => {
           </Alert>
         )}
 
-        {serverInfo && !identificationData && (
+        {serverInfo && !hasData && (
           <Alert severity="warning" sx={{ mb: 3, width: '100%', maxWidth: '1400px' }}>
-            Connected to server but no identification data available.
-            Make sure the server has an /identification endpoint.
+            Connected to server but no data available.
+            Make sure the server has GET endpoints.
           </Alert>
         )}
 
-        {displayData ? (
+        {hasData ? (
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', md: 'row' },
-              gap: 10,
               width: '100%',
-              maxWidth: '600px',
+              maxWidth: '1400px',
+              display: 'flex',
               justifyContent: 'center',
             }}
           >
-            {/* Picture Column - Left */}
-            <Box sx={{
-              flex: { xs: '1 1 100%', md: '0 0 auto' },
-              minWidth: { md: '350px' },
-              maxWidth: { md: '350px' },
-              mt: 1,
-            }}>
-              <DevicePicture pictureData={pictureData} />
-            </Box>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 4,
+                alignItems: 'flex-start',
+                width: 'fit-content',
+              }}
+            >
+              {/* Picture Column - Always show if available */}
+              {pictureData && (
+                <Box
+                  sx={{
+                    flex: '0 0 auto',
+                    width: { xs: '100%', md: '350px' },
+                  }}
+                >
+                  <DevicePicture pictureData={pictureData} />
+                </Box>
+              )}
 
-            {/* Table Column - Right */}
-            <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 67%' } }}>
-              <DynamicTable data={displayData} title="identification" endpoint="identification" />
+              {/* Tables Column */}
+              <Box
+                sx={{
+                  flex: '0 0 auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  width: 'fit-content',
+                }}
+              >
+                {getEndpoints.map(([endpoint, value]) => {
+                  const displayData = endpoint === 'identification' && value.data
+                    ? excludeFields(value.data, [...COMMON_HIDDEN_FIELDS, 'user'])
+                    : value.data;
+
+                  return (
+                    <DynamicTable
+                      key={endpoint}
+                      data={displayData}
+                      title={endpoint}
+                      endpoint={endpoint}
+                    />
+                  );
+                })}
+              </Box>
             </Box>
           </Box>
         ) : (
-          <Typography variant="body1" color="text.secondary">
-            No data to display. Please connect to a server first.
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+            <Typography variant="body1" color="text.secondary">
+              No data to display. Please connect to a server first.
+            </Typography>
+          </Box>
         )}
       </Box>
     </>

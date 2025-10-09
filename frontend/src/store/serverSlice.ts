@@ -20,8 +20,15 @@ interface ServerInfo {
   links: Link[];
 }
 
+interface EndpointResult {
+  url: string;
+  data: any;
+  method: string;
+  fetchedAt: string;
+}
+
 interface EndpointData {
-  [key: string]: any;
+  [key: string]: EndpointResult;
 }
 
 interface ServerState {
@@ -81,12 +88,12 @@ export const fetchAllEndpoints = createAsyncThunk(
               const response = await fetch(fullUrl);
               if (response.ok) {
                 const blob = await response.blob();
-                const objectUrl = URL.createObjectURL(blob); // Fast!
+                const objectUrl = URL.createObjectURL(blob);
 
                 results[link.rel] = {
                   url: fullUrl,
                   data: {
-                    objectUrl, // Just store the URL, not the data
+                    objectUrl,
                     contentType: response.headers.get('Content-Type') || 'image/jpeg',
                     filename: 'device-image.jpg',
                   },
@@ -95,13 +102,23 @@ export const fetchAllEndpoints = createAsyncThunk(
                 };
               }
             } else {
-              // JSON endpoints
-              const response = await fetch(fullUrl);
-              if (response.ok) {
-                const data = await response.json();
+              // JSON endpoints - Only fetch GET methods
+              if (link.method === 'GET') {
+                const response = await fetch(fullUrl);
+                if (response.ok) {
+                  const data = await response.json();
+                  results[link.rel] = {
+                    url: fullUrl,
+                    data,
+                    method: link.method,
+                    fetchedAt: new Date().toISOString(),
+                  };
+                }
+              } else {
+                // Store POST/PUT/DELETE endpoints info without fetching
                 results[link.rel] = {
                   url: fullUrl,
-                  data,
+                  data: null,
                   method: link.method,
                   fetchedAt: new Date().toISOString(),
                 };
@@ -136,6 +153,9 @@ const serverSlice = createSlice({
       state.endpointData = {};
       state.error = null;
     },
+    setError: (state, action) => {
+      state.error = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -168,5 +188,5 @@ const serverSlice = createSlice({
   },
 });
 
-export const { clearServerData } = serverSlice.actions;
+export const { clearServerData, setError } = serverSlice.actions;
 export default serverSlice.reducer;
