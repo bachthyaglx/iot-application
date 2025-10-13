@@ -1,25 +1,57 @@
 {
-  "name": "4.23",
+  "name": "realtime-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Real-time backend server with Socket.IO and Redis",
+  "main": "server.js",
   "scripts": {
-    "start": "concurrently \"nodemon --legacy-watch server.js --ignore src/open-api/*.json --ignore src/open-api/*.yaml\" \"nodemon --legacy-watch realtime-server.js\" \"node src/socket/socketPublisher.js\" \"node src/utils/genSwagger.js\"",
-    "dev": "concurrently \"nodemon --legacy-watch server.js --ignore src/open-api/*.json --ignore src/open-api/*.yaml\" \"nodemon --legacy-watch realtime-server.js\" \"node src/socket/socketPublisher.js\" \"node src/utils/genSwagger.js\""
+    "dev": "concurrently --kill-others-on-fail --prefix \"[{name}]\" --names \"API,RT,REDIS,SWAGGER\" -c \"cyan,magenta,yellow,green\" \"nodemon --config nodemon.json server.js\" \"nodemon --config nodemon.json realtime-server.js\" \"node src/socket/socketPublisher.js\" \"nodemon --config nodemon-swagger.json src/utils/genSwagger.js\"",
+    "start": "node server.js",
+    "start:realtime": "node realtime-server.js",
+    "start:publisher": "node src/socket/socketPublisher.js",
+    "start:swagger": "node src/utils/genSwagger.js",
+    "start:all": "concurrently --prefix \"[{name}]\" --names \"API,RT,REDIS,SWAGGER\" -c \"cyan,magenta,yellow,green\" \"node server.js\" \"node realtime-server.js\" \"node src/socket/socketPublisher.js\" \"node src/utils/genSwagger.js\"",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint src --ext .js",
+    "lint:fix": "eslint src --ext .js --fix",
+    "format": "prettier --write \"src/**/*.js\"",
+    "clean": "rm -rf node_modules dist coverage",
+    "build": "echo 'No build step required for Node.js'",
+    "logs": "pm2 logs",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop all",
+    "pm2:restart": "pm2 restart all",
+    "pm2:delete": "pm2 delete all",
+    "seed:user": "node --no-deprecation src/seeds/seedUserData.js",
+    "seed:identification": "node --no-deprecation src/seeds/seedIdentificationData.js",
+    "seed:picture": "node --no-deprecation src/seeds/seedPictureData.js",
+    "seed:device": "node --no-deprecation src/seeds/seedDeviceData.js",
+    "seed:diagnostics": "node --no-deprecation src/seeds/seedDiagnosticsData.js",
+    "seed:configuration": "node --no-deprecation src/seeds/seedConfigurationData.js",
+    "seed:maintenance": "node --no-deprecation src/seeds/seedMaintenanceData.js"
   },
+  "keywords": [
+    "socket.io",
+    "redis",
+    "realtime",
+    "nodejs",
+    "express"
+  ],
   "author": "4.23",
   "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
     "bcrypt": "^5.1.1",
-    "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.18.2",
     "express-async-errors": "^3.1.1",
     "js-yaml": "^4.1.0",
     "jsonwebtoken": "^9.0.2",
-    "lint": "^0.8.19",
     "lodash": "^4.17.21",
     "module-alias": "^2.2.3",
     "mongodb": "^6.16.0",
@@ -28,21 +60,28 @@
     "redis": "^5.5.5",
     "socket.io": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1",
-    "vite": "^5.2.8"
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.32.2",
-    "install": "^0.13.0",
     "jest": "^29.7.0",
     "nodemon": "^2.0.22",
-    "npm": "^9.8.1",
+    "prettier": "^3.0.0",
     "supertest": "^6.3.4"
   },
   "jest": {
     "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/*.test.js"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
     "globalTeardown": "./tests/teardown.js"
   },
   "_moduleAliases": {

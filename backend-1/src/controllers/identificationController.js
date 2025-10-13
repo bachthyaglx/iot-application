@@ -60,18 +60,18 @@
  *       500:
  *         description: Failed to update device
  */
-const Device = require('../models/info')
+const Identification = require('../models/identification')
 const { cacheGet, cacheSet, client } = require('../utils/redisClient')
 
-const CACHE_KEY = 'deviceInfo' // consistent Redis key
+const CACHE_KEY = 'identification' // consistent Redis key
 
-const getInformation = async (req, res) => {
+const getIdentification = async (req, res) => {
   const cached = await cacheGet(CACHE_KEY)
   if (cached) {
     return res.json(cached)
   }
 
-  const data = await Device.findOne({})
+  const data = await Identification.findOne({})
   if (data) {
     await cacheSet(CACHE_KEY, data)
   }
@@ -79,8 +79,8 @@ const getInformation = async (req, res) => {
   res.json(data)
 }
 
-const updateDevice = async (req, res) => {
-  const existing = await Device.findOne({})
+const updateIdentification = async (req, res) => {
+  const existing = await Identification.findOne({})
   if (!existing) {
     return res.status(404).json({ error: 'Device not found' })
   }
@@ -98,6 +98,6 @@ const updateDevice = async (req, res) => {
 }
 
 module.exports = {
-  getInformation,
-  updateDevice
+  getIdentification,
+  updateIdentification
 }

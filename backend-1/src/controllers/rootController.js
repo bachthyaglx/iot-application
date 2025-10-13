@@ -80,14 +80,29 @@ const getRoot = async (req, res) => {
     security: 'basic_sc',
     links: isAuthenticated
       ? [
-        { href: '/information', rel: 'information', method: 'GET' },
-        { href: '/information', rel: 'information', method: 'PUT' },
+        // Basic Information - Public & Protected
+        { href: '/identification', rel: 'identification', method: 'GET' },
+        { href: '/identification', rel: 'identification', method: 'PUT' },
         { href: '/picture', rel: 'picture', method: 'GET' },
         { href: '/picture', rel: 'picture', method: 'PUT' },
-        { href: '/data', rel: 'data', method: 'GET' },
+        { href: '/device/ports', rel: 'device-ports', method: 'GET' },
+        { href: '/device/port/{portId}', rel: 'device-port', method: 'GET' },
+        { href: '/device/port/{portId}', rel: 'device-port', method: 'PUT' },
+        { href: '/diagnostics', rel: 'diagnostics', method: 'GET' },
+        { href: '/diagnostics', rel: 'diagnostics', method: 'PUT' },
+        { href: '/diagnostics', rel: 'diagnostics', method: 'DELETE' },
+        { href: '/configuration', rel: 'configuration', method: 'GET' },
+        { href: '/configuration', rel: 'configuration', method: 'PATCH' },
+        { href: '/maintenance', rel: 'maintenance', method: 'GET' },
+        { href: '/maintenance', rel: 'maintenance', method: 'PUT' },
+        { href: '/maintenance/reboot', rel: 'reboot', method: 'POST' },
+        { href: '/maintenance/factorysettings', rel: 'factory-reset', method: 'POST' },
+        { href: '/maintenance/fwupdate', rel: 'firmware-update', method: 'POST' },
+        // { href: '/data', rel: 'data', method: 'GET' },
         { href: '/logout', rel: 'logout', method: 'POST' }
       ]
       : [
+        // Public endpoints (read-only) when not authenticated
         { href: '/identification', rel: 'identification', method: 'GET' },
         { href: '/picture', rel: 'picture', method: 'GET' },
         { href: '/login', rel: 'login', method: 'POST' }

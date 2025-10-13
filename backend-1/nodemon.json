@@ -1,0 +1,24 @@
+{
+  "watch": [
+    "src/**/*.js",
+    "server.js",
+    "realtime-server.js",
+    ".env"
+  ],
+  "ignore": [
+    "node_modules/**",
+    "tests/**",
+    "coverage/**",
+    "src/open-api/**/*.json",
+    "src/open-api/**/*.yaml",
+    "*.log",
+    ".git"
+  ],
+  "ext": "js,json",
+  "legacyWatch": true,
+  "delay": 1000,
+  "verbose": false,
+  "events": {
+    "restart": "echo '🔄 Server restarted'"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "watch": [
+    "src/**/*.js"
+  ],
+  "ignore": [
+    "node_modules/**",
+    "tests/**",
+    "coverage/**",
+    "src/open-api/**",
+    "*.log",
+    ".git"
+  ],
+  "ext": "js",
+  "legacyWatch": true,
+  "delay": 2000,
+  "verbose": false,
+  "runOnChangeOnly": true,
+  "events": {
+    "restart": "echo '📝 Swagger docs regenerated'"
+  }
+}

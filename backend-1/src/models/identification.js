@@ -1,7 +1,7 @@
 /* eslint-disable linebreak-style */
 const mongoose = require('mongoose')
 
-const deviceSchema = new mongoose.Schema({
+const IdentificationSchema = new mongoose.Schema({
   deviceClass: String,
   manufacturer: String,
   manufacturerUri: String,
@@ -22,7 +22,7 @@ const deviceSchema = new mongoose.Schema({
   }
 })
 
-deviceSchema.set('toJSON', {
+IdentificationSchema.set('toJSON', {
   transform: (document, returnedObject) => {
     returnedObject.id = returnedObject._id.toString()
     delete returnedObject._id
@@ -30,4 +30,4 @@ deviceSchema.set('toJSON', {
   }
 })
 
-module.exports = mongoose.model('Device', deviceSchema)
+module.exports = mongoose.model('Identification', IdentificationSchema)

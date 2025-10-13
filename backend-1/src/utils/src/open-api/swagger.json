@@ -88,6 +88,101 @@
         }
       }
     },
+    "/api/configuration": {
+      "get": {
+        "summary": "Get device configuration",
+        "description": "Returns complete device configuration or filtered by topic/subtopic. Data is cached in Redis.",
+        "tags": [
+          "Configuration"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "topic",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Configuration topic (e.g., show-all, mqtt)"
+          },
+          {
+            "in": "query",
+            "name": "subtopic",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Configuration subtopic (e.g., show-all)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configuration data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create/Update configuration",
+        "description": "Creates or updates device configuration. Requires authentication.",
+        "tags": [
+          "Configuration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration updated successfully"
+          },
+          "500": {
+            "description": "Failed to update configuration"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Partially update configuration",
+        "description": "Partially updates device configuration. Requires authentication.",
+        "tags": [
+          "Configuration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration updated successfully"
+          },
+          "404": {
+            "description": "Configuration not found"
+          },
+          "500": {
+            "description": "Failed to update configuration"
+          }
+        }
+      }
+    },
     "/api/data": {
       "get": {
         "summary": "Get latest sensor data",
@@ -130,6 +225,296 @@
           },
           "401": {
             "description": "Unauthorized - missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/device/port/{portId}": {
+      "get": {
+        "summary": "Get specific port information",
+        "description": "Returns information for a specific port. Data is cached in Redis for performance.",
+        "tags": [
+          "Device Ports"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "portId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Port identifier (e.g., XD1, XF1, X0, HMI)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Port information array with fields and data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "object"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Port not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/device/ports": {
+      "get": {
+        "summary": "Get all ports information",
+        "description": "Returns information for all device ports. Data is cached in Redis.",
+        "tags": [
+          "Device Ports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Object containing all ports data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/diagnostics": {
+      "get": {
+        "summary": "Get device diagnostics",
+        "description": "Returns device diagnostics including port statistics. Data is cached in Redis for performance.",
+        "tags": [
+          "Diagnostics"
+        ],
+        "responses": {
+          "200": {
+            "description": "Diagnostics data with port statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "PortStatistics": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "channel": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "Info",
+                              "Warning",
+                              "Maintenance requested",
+                              "Fault",
+                              "Critical"
+                            ]
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "Occured",
+                              "Cleared",
+                              "Active",
+                              "Inactive"
+                            ]
+                          },
+                          "time": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update diagnostics data",
+        "description": "Updates device diagnostics and invalidates Redis cache. Requires authentication.",
+        "tags": [
+          "Diagnostics"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "PortStatistics": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated diagnostics data"
+          },
+          "404": {
+            "description": "Diagnostics not found"
+          },
+          "500": {
+            "description": "Failed to update diagnostics"
+          }
+        }
+      },
+      "post": {
+        "summary": "Add new diagnostic entry",
+        "description": "Adds a new port statistic entry to diagnostics. Requires authentication.",
+        "tags": [
+          "Diagnostics"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "channel": {
+                    "type": "string"
+                  },
+                  "severity": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "time": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Diagnostic entry added successfully"
+          },
+          "400": {
+            "description": "Invalid request data"
+          },
+          "500": {
+            "description": "Failed to add diagnostic entry"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Clear all diagnostics",
+        "description": "Clears all port statistics. Requires authentication.",
+        "tags": [
+          "Diagnostics"
+        ],
+        "responses": {
+          "200": {
+            "description": "Diagnostics cleared successfully"
+          },
+          "404": {
+            "description": "Diagnostics not found"
+          },
+          "500": {
+            "description": "Failed to clear diagnostics"
           }
         }
       }
@@ -208,6 +593,161 @@
           },
           "500": {
             "description": "Failed to update device"
+          }
+        }
+      }
+    },
+    "/api/maintenance": {
+      "get": {
+        "summary": "Get maintenance information",
+        "description": "Returns maintenance links, digital twin info, and IODD catalog. Data is cached in Redis.",
+        "tags": [
+          "Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Maintenance data including links and IODD catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "digitaltwin": {
+                      "type": "object",
+                      "properties": {
+                        "forms": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    },
+                    "backup_restore": {
+                      "type": "object"
+                    },
+                    "factorysettings": {
+                      "type": "object"
+                    },
+                    "firmware_update": {
+                      "type": "object"
+                    },
+                    "iodd_catalog": {
+                      "type": "object",
+                      "properties": {
+                        "ethIpv4": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update maintenance data",
+        "description": "Updates maintenance configuration. Requires authentication.",
+        "tags": [
+          "Maintenance"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated maintenance data"
+          },
+          "404": {
+            "description": "Maintenance not found"
+          },
+          "500": {
+            "description": "Failed to update maintenance"
+          }
+        }
+      }
+    },
+    "/api/maintenance/reboot": {
+      "post": {
+        "summary": "Reboot device",
+        "description": "Triggers device reboot. Requires authentication.",
+        "tags": [
+          "Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Reboot initiated successfully"
+          },
+          "500": {
+            "description": "Failed to initiate reboot"
+          }
+        }
+      }
+    },
+    "/api/maintenance/factorysettings": {
+      "post": {
+        "summary": "Reset to factory settings",
+        "description": "Resets device to factory settings. Requires authentication.",
+        "tags": [
+          "Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Factory reset initiated successfully"
+          },
+          "500": {
+            "description": "Failed to initiate factory reset"
+          }
+        }
+      }
+    },
+    "/api/maintenance/fwupdate": {
+      "post": {
+        "summary": "Update firmware",
+        "description": "Initiates firmware update process. Requires authentication.",
+        "tags": [
+          "Maintenance"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "firmware": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Firmware update initiated successfully"
+          },
+          "400": {
+            "description": "Invalid firmware file"
+          },
+          "500": {
+            "description": "Failed to initiate firmware update"
           }
         }
       }
@@ -352,8 +892,24 @@
   "components": {},
   "tags": [
     {
+      "name": "Configuration",
+      "description": "Device configuration management"
+    },
+    {
+      "name": "Device Ports",
+      "description": "Device port information and configuration"
+    },
+    {
+      "name": "Diagnostics",
+      "description": "Device diagnostics and port statistics"
+    },
+    {
       "name": "Device",
       "description": "Device information and metadata"
+    },
+    {
+      "name": "Maintenance",
+      "description": "Device maintenance operations and IODD catalog"
     },
     {
       "name": "Picture",
