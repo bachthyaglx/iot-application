@@ -13,6 +13,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { fetchAllEndpoints } from '../store/serverSlice';
 import DynamicTable from '../components/DynamicTable';
+import { splitDataIntoTables } from '../utils/splitData';
 import { excludeFields, COMMON_HIDDEN_FIELDS } from '../utils/dataFilter';
 
 interface DynamicPageProps {
@@ -36,6 +37,14 @@ const DynamicPage: React.FC<DynamicPageProps> = ({ endpoint, onBack }) => {
     return excludeFields(currentEndpointData.data, COMMON_HIDDEN_FIELDS);
   }, [currentEndpointData]);
 
+  // Split data into multiple tables
+  const tables = useMemo(() => {
+    if (!displayData) return [];
+
+    // Use splitDataIntoTables to split complex data into separate tables
+    return splitDataIntoTables(displayData, endpoint);
+  }, [displayData, endpoint]);
+
   // Handle update endpoint data
   const handleUpdateEndpoint = useCallback(
     async (endpoint: string, updatedData: any) => {
@@ -57,6 +66,7 @@ const DynamicPage: React.FC<DynamicPageProps> = ({ endpoint, onBack }) => {
 
         if (!response.ok) throw new Error('Failed to update data');
 
+        // Refresh all endpoint data after successful update
         await dispatch(fetchAllEndpoints()).unwrap();
         return true;
       } catch (error) {
@@ -120,21 +130,25 @@ const DynamicPage: React.FC<DynamicPageProps> = ({ endpoint, onBack }) => {
         </Typography>
       </Breadcrumbs>
 
-      {/* Content */}
+      {/* Content - Display multiple tables */}
       <Box
         sx={{
           display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'flex-start',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 3, // Space between tables
         }}
       >
-        {displayData ? (
-          <DynamicTable
-            data={displayData}
-            title={endpoint}
-            endpoint={endpoint}
-            onUpdate={handleUpdateEndpoint}
-          />
+        {tables.length > 0 ? (
+          tables.map((table) => (
+            <DynamicTable
+              key={table.key}
+              data={table.data}
+              title={table.title}
+              endpoint={table.endpoint}
+              onUpdate={handleUpdateEndpoint}
+            />
+          ))
         ) : (
           <Alert severity="info">
             No data available for this endpoint

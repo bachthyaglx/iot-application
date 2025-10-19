@@ -1,4 +1,3 @@
-// src/components/DynamicTable.tsx
 import React, { useState, useCallback, useMemo, memo } from 'react';
 import {
   Table,
@@ -12,6 +11,7 @@ import {
   IconButton,
   Button,
   Stack,
+  TableHead,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,7 +25,31 @@ interface DynamicTableProps {
   onUpdate: (endpoint: string, updatedData: any) => Promise<boolean>;
 }
 
-// Memoized EditableInput component
+// -----------------------------------------------------------
+// Helper: Tính toán độ rộng Key tối đa (cho các object lồng nhau)
+// -----------------------------------------------------------
+const calculateMaxKeyLength = (obj: any, utils: any): number => {
+  let maxLength = 0;
+  if (!utils.isObject(obj)) return 0;
+
+  const traverse = (current: any) => {
+    Object.keys(current).forEach(key => {
+      maxLength = Math.max(maxLength, key.length);
+      const value = current[key];
+      if (utils.isObject(value) && !utils.isArray(value)) {
+        traverse(value);
+      }
+    });
+  };
+  traverse(obj);
+  const minWidth = 100;
+  return Math.max(minWidth, maxLength * 8 + 16);
+};
+
+
+// -----------------------------------------------------------
+// EditableInput Component (Unchanged)
+// -----------------------------------------------------------
 const EditableInput = memo<{
   fieldKey: string;
   value: any;
@@ -37,7 +61,6 @@ const EditableInput = memo<{
 
   return (
     <Box sx={{ position: 'relative', display: 'block', width: '100%' }}>
-      {/* Invisible text to maintain height */}
       <Box
         sx={{
           fontSize: '0.875rem',
@@ -52,7 +75,6 @@ const EditableInput = memo<{
       >
         {originalDisplayValue}
       </Box>
-      {/* Actual input - positioned absolutely to overlay the invisible box */}
       <input
         type="text"
         value={displayValue}
@@ -80,6 +102,9 @@ const EditableInput = memo<{
 
 EditableInput.displayName = 'EditableInput';
 
+// -----------------------------------------------------------
+// DynamicTable Component
+// -----------------------------------------------------------
 const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUpdate }) => {
   const { isLoggedIn } = useAuth();
 
@@ -87,7 +112,6 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
   const [editedData, setEditedData] = useState<any>({});
   const [updating, setUpdating] = useState(false);
 
-  // Memoized utility functions
   const utils = useMemo(() => ({
     isObject: (value: any): boolean => {
       return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -108,54 +132,39 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
 
   const { isObject, isArray, isPrimitive, isArrayOfObjects } = utils;
 
-  // Memoized max columns calculation
-  const maxColumns = useMemo(() => {
-    if (!isObject(data)) return 2;
+  // -----------------------------------------------------------
+  // Tính toán độ rộng Key tối đa cho Object lồng nhau (Khắc phục lỗi TS Scope)
+  // -----------------------------------------------------------
+  const maxKeyWidthMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!isObject(data)) return map;
 
-    let maxCols = 2;
-    Object.values(data).forEach((value) => {
-      if (isArray(value) && isArrayOfObjects(value as any[])) {
-        maxCols = Math.max(maxCols, 1 + 1 + (value as any[]).length);
-      } else if (isObject(value) && !isArray(value)) {
-        const allValuesAreObjects = Object.values(value as Record<string, unknown>).every(
-          (v) => isObject(v) && !isArray(v)
-        );
-        if (allValuesAreObjects) {
-          const numSubObjects = Object.keys(value as object).length;
-          maxCols = Math.max(maxCols, 1 + 1 + numSubObjects);
-        } else {
-          const subEntries = Object.entries(value as Record<string, unknown>);
-          let hasNestedObjects = false;
-          subEntries.forEach(([_, subValue]) => {
-            if (isObject(subValue) && !isArray(subValue)) {
-              hasNestedObjects = true;
-            }
-          });
-          if (hasNestedObjects) {
-            maxCols = Math.max(maxCols, 4);
-          }
-        }
+    Object.entries(data).forEach(([outerKey, outerValue]) => {
+      if (isObject(outerValue) && !isArray(outerValue)) {
+        const maxWidth = calculateMaxKeyLength(outerValue, utils);
+        map.set(outerKey, `${maxWidth}px`);
       }
     });
-    return maxCols;
-  }, [data, isObject, isArray, isArrayOfObjects]);
+    return map;
+  }, [data, isObject, isArray, utils]);
 
   const handleEditClick = useCallback(() => {
     setIsEditing(true);
     setEditedData(JSON.parse(JSON.stringify(data)));
   }, [data]);
 
-  // Helper function to set nested value by path
   const setNestedValue = useCallback((obj: any, path: string, value: any) => {
     const keys = path.split('.');
     const lastKey = keys.pop()!;
     const target = keys.reduce((acc, key) => {
-      // Handle array indices
       const arrayMatch = key.match(/^(.+)\[(\d+)\]$/);
       if (arrayMatch) {
         const [, arrayKey, index] = arrayMatch;
+        if (!acc[arrayKey] || !Array.isArray(acc[arrayKey])) acc[arrayKey] = [];
+        if (!acc[arrayKey][parseInt(index)]) acc[arrayKey][parseInt(index)] = {};
         return acc[arrayKey][parseInt(index)];
       }
+      if (!acc[key] || typeof acc[key] !== 'object') acc[key] = {};
       return acc[key];
     }, obj);
     target[lastKey] = value;
@@ -164,7 +173,13 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
   const handleFieldChange = useCallback((path: string, value: any) => {
     setEditedData((prev: any) => {
       const newData = JSON.parse(JSON.stringify(prev));
-      setNestedValue(newData, path, value);
+      let typedValue: any = value;
+      if (typeof value === 'string') {
+        if (value.toLowerCase() === 'true') typedValue = true;
+        else if (value.toLowerCase() === 'false') typedValue = false;
+        else if (!isNaN(Number(value)) && value.trim() !== '') typedValue = Number(value);
+      }
+      setNestedValue(newData, path, typedValue);
       return newData;
     });
   }, [setNestedValue]);
@@ -191,13 +206,12 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
     setEditedData({});
   }, []);
 
-  // Helper to get nested value by path
   const getNestedValue = useCallback((obj: any, path: string) => {
     return path.split('.').reduce((acc, key) => {
       const arrayMatch = key.match(/^(.+)\[(\d+)\]$/);
       if (arrayMatch) {
         const [, arrayKey, index] = arrayMatch;
-        return acc[arrayKey]?.[parseInt(index)];
+        return acc?.[arrayKey]?.[parseInt(index)];
       }
       return acc?.[key];
     }, obj);
@@ -206,7 +220,7 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
   const renderEditableValue = useCallback((path: string, value: any): React.ReactNode => {
     if (!isPrimitive(value)) {
       return (
-        <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
+        <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'normal' }}>
           {String(value)}
         </Typography>
       );
@@ -227,271 +241,307 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
     if (isPrimitive(value)) {
       const displayValue = value === null ? 'null' : value === undefined ? 'undefined' : String(value);
       return (
-        <Box
+        <Typography
+          variant="body2"
           sx={{
-            position: 'relative',
-            minWidth: 'max-content',
-            display: 'inline-block'
+            fontSize: '0.875rem',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
           }}
+          title={displayValue}
         >
-          <Box
-            sx={{
-              fontSize: '0.875rem',
-              lineHeight: '1.43',
-              padding: '2px 4px',
-              minHeight: '20px',
-              border: '1px solid transparent',
-              boxSizing: 'border-box',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {displayValue}
-          </Box>
-        </Box>
+          {displayValue}
+        </Typography>
       );
     }
     if (isArray(value) && !isArrayOfObjects(value)) {
-      const displayValue = value.map((item: Primitive) => isPrimitive(item) ? String(item) : JSON.stringify(item)).join(', ');
+      const displayValue = `[${value.map((item: Primitive) => isPrimitive(item) ? String(item) : JSON.stringify(item)).join(', ')}]`;
       return (
-        <Box
+        <Typography
+          variant="body2"
           sx={{
-            position: 'relative',
-            minWidth: 'max-content',
-            display: 'inline-block'
+            fontSize: '0.875rem',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
           }}
+          title={displayValue}
         >
-          <Box
-            sx={{
-              fontSize: '0.875rem',
-              lineHeight: '1.43',
-              padding: '2px 4px',
-              minHeight: '20px',
-              border: '1px solid transparent',
-              boxSizing: 'border-box',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {displayValue}
-          </Box>
-        </Box>
+          {displayValue}
+        </Typography>
       );
     }
     return null;
   }, [isPrimitive, isArray, isArrayOfObjects]);
 
-  const renderObjectRows = useCallback((obj: any, parentKey: string = ''): React.ReactNode[] => {
-    const rows: React.ReactNode[] = [];
-    const displayData = isEditing ? editedData : obj;
+  // -----------------------------------------------------------
+  // RENDER ARRAY OF OBJECTS (Bảng Chi tiết)
+  // -----------------------------------------------------------
+  const renderArrayOfObjectsTable = useCallback((arr: any[], arrayKey: string): React.ReactNode => {
+    if (arr.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={10}>
+            <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
+              No data available for {arrayKey}.
+            </Typography>
+          </TableCell>
+        </TableRow>
+      );
+    }
 
-    Object.entries(displayData).forEach(([key, value]) => {
-      const fullKey = parentKey ? `${parentKey}.${key}` : key;
+    const allKeys = Array.from(new Set(arr.flatMap(obj => Object.keys(obj))));
 
-      if (isArray(value) && isArrayOfObjects(value as any[])) {
-        const arr = value as any[];
-        const allKeys = Array.from(new Set(arr.flatMap(obj => Object.keys(obj))));
+    return (
+      <TableContainer component={Box} sx={{ mt: 1, mb: 1 }}>
+        <Table size="small" sx={{
+          border: '1px solid rgba(224, 224, 224, 1)',
+          '& .MuiTableCell-root': {
+            borderRight: '1px solid rgba(224, 224, 224, 1)',
+            borderBottom: '1px solid rgba(224, 224, 224, 1)',
+            '&:last-child': { borderRight: 'none' },
+          },
+          '& .MuiTableRow-root:last-child .MuiTableCell-root': {
+            borderBottom: 'none',
+          },
+        }}>
+          <TableHead>
+            <TableRow>
+              {allKeys.map(key => (
+                <TableCell key={key} sx={{ fontWeight: 'bold', fontSize: '0.875rem', py: 0.5, verticalAlign: 'middle' }}>
+                  {key.charAt(0).toUpperCase() + key.slice(1)}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {arr.map((item, index) => (
+              <TableRow key={index}>
+                {allKeys.map(key => {
+                  const cellPath = `${arrayKey}[${index}].${key}`;
+                  const cellValue = item[key];
 
-        allKeys.forEach((propKey, index) => {
-          rows.push(
-            <TableRow key={`${fullKey}.${propKey}`}>
-              {index === 0 && (
-                <TableCell
-                  rowSpan={allKeys.length}
+                  return (
+                    <TableCell key={key} sx={{ verticalAlign: 'middle', py: 0.5 }}>
+                      {isEditing && isPrimitive(cellValue) ? (
+                        renderEditableValue(cellPath, cellValue)
+                      ) : (
+                        renderSimpleValue(cellValue) || (
+                          <Box sx={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
+                            {JSON.stringify(cellValue, null, 2)}
+                          </Box>
+                        )
+                      )}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    );
+  }, [isEditing, isPrimitive, renderEditableValue, renderSimpleValue]);
+
+  /**
+   * Hàm render object lồng nhau sử dụng Flexbox để kiểm soát border/width tốt hơn.
+   */
+  const renderNestedObject = useCallback((obj: any, fullKey: string, isLastParentRow: boolean, keyWidth: string): React.ReactNode => {
+    const entries = Object.entries(obj);
+
+    return (
+      <Box sx={{ width: '100%', borderLeft: '1px solid rgba(224, 224, 224, 1)' }}>
+        {entries.map(([subKey, subValue], index) => {
+          const subPath = `${fullKey}.${subKey}`;
+          const isLastItem = index === entries.length - 1;
+          const nextIsLastParentRow = isLastParentRow && isLastItem;
+
+          if (isObject(subValue) && !isArray(subValue)) {
+            // Object lồng nhau -> recursive call
+            return (
+              <Box
+                key={subKey}
+                sx={{
+                  display: 'flex',
+                  // KHẮC PHỤC DOUBLE BORDER: Bỏ border dưới nếu là hàng cuối cùng của toàn bộ cấu trúc lồng nhau (nextIsLastParentRow)
+                  borderBottom: nextIsLastParentRow ? 'none' : '1px solid rgba(224, 224, 224, 1)',
+                }}
+              >
+                {/* Key Column */}
+                <Box
                   sx={{
-                    fontWeight: 'bold',
-                    verticalAlign: 'middle',
-                    textAlign: 'center',
+                    fontWeight: 500,
                     fontSize: '0.875rem',
                     px: 1,
                     py: 0.5,
-                    whiteSpace: 'nowrap',
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                    width: keyWidth,
+                    minWidth: keyWidth,
+                    borderRight: '1px solid rgba(224, 224, 224, 1)',
+                    display: 'flex',
+                    alignItems: 'center', // Căn giữa dọc
                   }}
                 >
-                  {key}
-                </TableCell>
-              )}
-              <TableCell
+                  {subKey}
+                </Box>
+                {/* Value Column (chứa object lồng) */}
+                <Box sx={{ flexGrow: 1, padding: 0 }}>
+                  {renderNestedObject(subValue, subPath, nextIsLastParentRow, keyWidth)}
+                </Box>
+              </Box>
+            );
+          }
+
+          // Primitive value
+          return (
+            <Box
+              key={subKey}
+              sx={{
+                display: 'flex',
+                // KHẮC PHỤC DOUBLE BORDER: Bỏ border dưới nếu là hàng cuối cùng của toàn bộ cấu trúc lồng nhau (nextIsLastParentRow)
+                borderBottom: nextIsLastParentRow ? 'none' : '1px solid rgba(224, 224, 224, 1)',
+              }}
+            >
+              {/* Key Column */}
+              <Box
                 sx={{
-                  fontWeight: 600,
-                  verticalAlign: 'top',
+                  fontWeight: 500,
                   fontSize: '0.875rem',
                   px: 1,
                   py: 0.5,
-                  whiteSpace: 'nowrap',
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
+                  width: keyWidth, // Áp dụng width tối đa
+                  minWidth: keyWidth,
+                  borderRight: '1px solid rgba(224, 224, 224, 1)',
+                  display: 'flex',
+                  alignItems: 'center', // Căn giữa dọc
                 }}
               >
-                {propKey}
-              </TableCell>
-              {arr.map((item, idx) => {
-                const cellValue = item[propKey];
-                const cellPath = `${fullKey}[${idx}].${propKey}`;
-
-                return (
-                  <TableCell
-                    key={idx}
-                    colSpan={idx === arr.length - 1 ? maxColumns - arr.length - 1 : 1}
-                    sx={{
-                      verticalAlign: 'top',
-                      px: 1,
-                      py: 0.5,
-                    }}
-                  >
-                    {isEditing && isPrimitive(cellValue) ? (
-                      renderEditableValue(cellPath, cellValue)
-                    ) : (
-                      <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
-                        {cellValue !== undefined
-                          ? (isPrimitive(cellValue)
-                            ? String(cellValue)
-                            : isArray(cellValue) && !isArrayOfObjects(cellValue)
-                              ? cellValue.join(', ')
-                              : JSON.stringify(cellValue))
-                          : '-'}
-                      </Typography>
-                    )}
-                  </TableCell>
-                );
-              })}
-            </TableRow>
+                {subKey}
+              </Box>
+              {/* Value Column */}
+              <Box
+                sx={{
+                  flexGrow: 1,
+                  px: 1,
+                  py: 0.5,
+                  display: 'flex',
+                  alignItems: 'center', // Căn giữa dọc
+                }}
+              >
+                {isEditing && isPrimitive(subValue) ?
+                  renderEditableValue(subPath, subValue) :
+                  renderSimpleValue(subValue)
+                }
+              </Box>
+            </Box>
           );
-        });
+        })}
+      </Box>
+    );
+  }, [isObject, isArray, isPrimitive, isEditing, renderEditableValue, renderSimpleValue]);
+
+
+  const renderObjectRows = useCallback((obj: any): React.ReactNode[] => {
+    const rows: React.ReactNode[] = [];
+    const displayData = isEditing ? editedData : obj;
+    const keys = Object.keys(displayData);
+    const totalKeys = keys.length;
+
+    keys.forEach((key, index) => {
+      const value = displayData[key];
+      const fullKey = key;
+      const isLastKey = index === totalKeys - 1;
+
+      const currentKeyWidth = maxKeyWidthMap.get(key) || '100px';
+
+      // TH1: Array of Objects (render bảng riêng)
+      if (isArray(value) && isArrayOfObjects(value as any[])) {
+        rows.push(
+          <TableRow key={fullKey}>
+            <TableCell
+              colSpan={2}
+              sx={{
+                fontWeight: 'bold',
+                verticalAlign: 'middle',
+                textAlign: 'left',
+                fontSize: '0.875rem',
+                px: 1,
+                py: 0.5,
+                whiteSpace: 'nowrap',
+                borderBottom: isLastKey ? 'none' : '1px solid rgba(224, 224, 224, 1)',
+              }}
+            >
+              {key}
+              {renderArrayOfObjectsTable(value as any[], fullKey)}
+            </TableCell>
+          </TableRow>
+        );
       }
+      // TH2: Object lồng nhau (Sử dụng Flexbox)
       else if (isObject(value) && !isArray(value)) {
-        if (!isEditing) {
-          const allValuesAreObjects = Object.values(value as Record<string, unknown>).every(v => isObject(v) && !isArray(v));
-
-          if (allValuesAreObjects) {
-            const subObjects = Object.entries(value as Record<string, any>);
-            const allSubKeys = Array.from(
-              new Set(
-                subObjects.flatMap(([_, subObj]) =>
-                  isObject(subObj) ? Object.keys(subObj as object) : []
-                )
-              )
-            );
-
-            allSubKeys.forEach((subKey, index) => {
-              rows.push(
-                <TableRow key={`${fullKey}.${subKey}`}>
-                  {index === 0 && (
-                    <TableCell
-                      rowSpan={allSubKeys.length}
-                      sx={{
-                        fontWeight: 'bold',
-                        verticalAlign: 'middle',
-                        textAlign: 'center',
-                        fontSize: '0.875rem',
-                        px: 1,
-                        py: 0.5,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {key}
-                    </TableCell>
-                  )}
-                  <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', px: 1, py: 0.5, whiteSpace: 'nowrap' }}>
-                    {subKey}
-                  </TableCell>
-                  {subObjects.map(([objKey, subObj], objIndex) => (
-                    <TableCell
-                      key={objKey}
-                      colSpan={objIndex === subObjects.length - 1 ? maxColumns - subObjects.length - 1 : 1}
-                      sx={{ verticalAlign: 'top', px: 1, py: 0.5 }}
-                    >
-                      <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
-                        {(() => {
-                          const cellValue = (subObj as Record<string, any>)[subKey];
-                          return cellValue !== undefined
-                            ? (isPrimitive(cellValue)
-                              ? String(cellValue)
-                              : isArray(cellValue) && !isArrayOfObjects(cellValue)
-                                ? cellValue.join(', ')
-                                : JSON.stringify(cellValue))
-                            : '-';
-                        })()}
-                      </Typography>
-                    </TableCell>
-                  ))}
-                </TableRow>
-              );
-            });
-          } else {
-            const subEntries = Object.entries(value as Record<string, unknown>);
-
-            subEntries.forEach(([subKey, subValue], index) => {
-              if (isObject(subValue) && !isArray(subValue)) {
-                const nestedEntries = Object.entries(subValue as Record<string, unknown>);
-
-                nestedEntries.forEach(([nestedKey, nestedValue], nestedIndex) => {
-                  rows.push(
-                    <TableRow key={`${fullKey}.${subKey}.${nestedKey}`}>
-                      {index === 0 && nestedIndex === 0 && (
-                        <TableCell
-                          rowSpan={subEntries.reduce((acc, [_, v]) => {
-                            if (isObject(v) && !isArray(v)) {
-                              return acc + Object.keys(v as object).length;
-                            }
-                            return acc + 1;
-                          }, 0)}
-                          sx={{ fontWeight: 'bold', verticalAlign: 'middle', textAlign: 'center', fontSize: '0.875rem', px: 1, py: 0.5, whiteSpace: 'nowrap' }}
-                        >
-                          {key}
-                        </TableCell>
-                      )}
-                      {nestedIndex === 0 && (
-                        <TableCell rowSpan={nestedEntries.length} sx={{ fontWeight: 600, verticalAlign: 'middle', fontSize: '0.875rem', px: 1, py: 0.5, whiteSpace: 'nowrap' }}>
-                          {subKey}
-                        </TableCell>
-                      )}
-                      <TableCell sx={{ fontWeight: 500, verticalAlign: 'top', fontSize: '0.875rem', px: 1, py: 0.5, whiteSpace: 'nowrap' }}>
-                        {nestedKey}
-                      </TableCell>
-                      <TableCell colSpan={maxColumns - 3} sx={{ px: 1, py: 0.5 }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
-                          {nestedValue !== undefined
-                            ? (isPrimitive(nestedValue) ? String(nestedValue) : JSON.stringify(nestedValue))
-                            : '-'}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  );
-                });
-              } else {
-                rows.push(
-                  <TableRow key={`${fullKey}.${subKey}`}>
-                    {index === 0 && (
-                      <TableCell
-                        rowSpan={subEntries.reduce((acc, [_, v]) => {
-                          if (isObject(v) && !isArray(v)) {
-                            return acc + Object.keys(v as object).length;
-                          }
-                          return acc + 1;
-                        }, 0)}
-                        sx={{ fontWeight: 'bold', verticalAlign: 'middle', textAlign: 'center', fontSize: '0.875rem', px: 1, py: 0.5 }}
-                      >
-                        {key}
-                      </TableCell>
-                    )}
-                    <TableCell sx={{ fontWeight: 600, verticalAlign: 'top', fontSize: '0.875rem', px: 1, py: 0.5, whiteSpace: 'nowrap' }}>
-                      {subKey}
-                    </TableCell>
-                    <TableCell colSpan={maxColumns - 2} sx={{ px: 1, py: 0.5 }}>
-                      {renderSimpleValue(subValue)}
-                    </TableCell>
-                  </TableRow>
-                );
-              }
-            });
-          }
-        }
+        rows.push(
+          <TableRow key={fullKey}>
+            <TableCell
+              sx={{
+                fontWeight: 'bold',
+                verticalAlign: 'middle',
+                textAlign: 'center',
+                fontSize: '0.875rem',
+                px: 1,
+                py: 0.5,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {key}
+            </TableCell>
+            <TableCell
+              sx={{
+                padding: 0,
+                borderRight: 'none',
+                borderBottom: 'none',
+              }}
+            >
+              {renderNestedObject(value, fullKey, isLastKey, currentKeyWidth)}
+            </TableCell>
+          </TableRow>
+        );
       }
+      // TH3: Primitive Value
       else {
         rows.push(
           <TableRow key={fullKey}>
-            <TableCell sx={{ fontWeight: 'bold', verticalAlign: 'middle', textAlign: 'left', fontSize: '0.875rem', px: 1, py: 0.5, whiteSpace: 'nowrap' }}>
+            <TableCell
+              sx={{
+                fontWeight: 'bold',
+                verticalAlign: 'middle',
+                textAlign: 'center',
+                fontSize: '0.875rem',
+                px: 1,
+                py: 0.5,
+                whiteSpace: 'nowrap',
+              }}
+            >
               {key}
             </TableCell>
-            <TableCell sx={{ px: 1, py: 0.5, whiteSpace: 'nowrap', width: isEditing ? '100%' : 'auto' }}>
-              {isEditing && isPrimitive(value) ? renderEditableValue(fullKey, value) : renderSimpleValue(value)}
+            <TableCell
+              sx={{
+                px: 1,
+                py: 0.5,
+                verticalAlign: 'middle',
+                // Kiểm soát border dưới: Bỏ nếu là key cuối cùng
+                borderBottom: isLastKey ? 'none' : '1px solid rgba(224, 224, 224, 1)',
+              }}
+            >
+              {isEditing && isPrimitive(value) ?
+                renderEditableValue(fullKey, value) :
+                isPrimitive(value) ?
+                  renderSimpleValue(value) :
+                  <Box sx={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
+                    {JSON.stringify(value, null, 2)}
+                  </Box>
+              }
             </TableCell>
           </TableRow>
         );
@@ -499,20 +549,23 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
     });
 
     return rows;
-  }, [isEditing, editedData, isArray, isArrayOfObjects, isObject, isPrimitive, maxColumns, renderEditableValue, renderSimpleValue]);
+  }, [isEditing, editedData, isArray, isArrayOfObjects, isObject, isPrimitive, renderEditableValue, renderSimpleValue, renderNestedObject, renderArrayOfObjectsTable, maxKeyWidthMap]);
 
   const formattedTitle = useMemo(() =>
     title ? title.charAt(0).toUpperCase() + title.slice(1) : null,
     [title]);
 
-  if (!isObject(data)) {
+  // Logic kiểm tra nếu data là Array of Objects (như PortStatistics)
+  const isTopLevelArray = isArray(data) && isArrayOfObjects(data as any[]);
+
+  if (!isObject(data) && !isTopLevelArray) {
     return (
       <TableContainer component={Paper}>
         <Table>
           <TableBody>
             <TableRow>
               <TableCell>
-                <Typography color="error">Invalid data: Expected an object</Typography>
+                <Typography color="error">Invalid data: Expected an object or Array of Objects</Typography>
               </TableCell>
             </TableRow>
           </TableBody>
@@ -521,6 +574,23 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
     );
   }
 
+  // -----------------------------------------------------------
+  // JSX chính
+  // -----------------------------------------------------------
+  if (isTopLevelArray) {
+    return (
+      <Box sx={{ position: 'relative', width: '100%' }}>
+        {formattedTitle && (
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+            {formattedTitle}
+          </Typography>
+        )}
+        {renderArrayOfObjectsTable(data as any[], title || 'Data')}
+      </Box>
+    );
+  }
+
+  // JSX cho Object chính
   return (
     <Box sx={{ position: 'relative', width: 'fit-content', maxWidth: '100%' }}>
       <Box sx={{ mb: 1, position: 'relative', display: 'flex', alignItems: 'center', minHeight: '32px' }}>
@@ -559,11 +629,13 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
           sx={{
             tableLayout: 'auto',
             width: '100%',
+            // Đặt border cho các cell của bảng chính
             '& .MuiTableCell-root': {
               borderRight: '1px solid rgba(224, 224, 224, 1)',
               borderBottom: '1px solid rgba(224, 224, 224, 1)',
               '&:last-child': { borderRight: 'none' },
             },
+            // Loại bỏ border dưới cho hàng cuối cùng của bảng chính
             '& .MuiTableRow-root:last-child .MuiTableCell-root': {
               borderBottom: 'none',
             },
@@ -579,10 +651,10 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
                   fontSize: '0.875rem',
                   px: 1,
                   py: 0.5,
+                  width: '1%',
                 }}
               />
               <TableCell
-                colSpan={maxColumns - 1}
                 sx={{
                   fontWeight: 'bold',
                   textAlign: 'center',
@@ -590,6 +662,7 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
                   fontSize: '0.875rem',
                   px: 1,
                   py: 0.5,
+                  width: '100%',
                 }}
               >
                 Data
