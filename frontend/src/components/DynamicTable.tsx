@@ -1,5 +1,5 @@
 // src/components/DynamicTable.tsx
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import {
   Table,
   TableBody,
@@ -12,11 +12,9 @@ import {
   IconButton,
   Button,
   Stack,
-  TextField,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { fetchAllEndpoints } from '../store/serverSlice';
+import { useAuth } from '../contexts/AuthContext';
 
 type Primitive = string | number | boolean | null | undefined;
 
@@ -24,36 +22,98 @@ interface DynamicTableProps {
   data: any;
   title?: string;
   endpoint?: string;
+  onUpdate: (endpoint: string, updatedData: any) => Promise<boolean>;
 }
 
-const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint }) => {
-  const dispatch = useAppDispatch();
-  const { serverUrl } = useAppSelector((state) => state.server);
-  const isAuthenticated = localStorage.getItem('authToken') !== null;
+// Memoized EditableInput component
+const EditableInput = memo<{
+  fieldKey: string;
+  value: any;
+  currentValue: any;
+  onChange: (key: string, value: any) => void;
+}>(({ fieldKey, value, currentValue, onChange }) => {
+  const displayValue = currentValue === null ? '' : String(currentValue);
+  const originalDisplayValue = value === null ? 'null' : value === undefined ? 'undefined' : String(value);
+
+  return (
+    <Box sx={{ position: 'relative', display: 'block', width: '100%' }}>
+      {/* Invisible text to maintain height */}
+      <Box
+        sx={{
+          fontSize: '0.875rem',
+          lineHeight: '1.43',
+          padding: '2px 4px',
+          minHeight: '20px',
+          border: '1px solid transparent',
+          boxSizing: 'border-box',
+          whiteSpace: 'nowrap',
+          visibility: 'hidden',
+        }}
+      >
+        {originalDisplayValue}
+      </Box>
+      {/* Actual input - positioned absolutely to overlay the invisible box */}
+      <input
+        type="text"
+        value={displayValue}
+        onChange={(e) => onChange(fieldKey, e.target.value)}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          fontSize: '0.875rem',
+          lineHeight: '1.43',
+          padding: '2px 4px',
+          minHeight: '20px',
+          width: '100%',
+          height: '100%',
+          border: '1px solid #ccc',
+          outline: 'none',
+          background: '#fff',
+          fontFamily: 'inherit',
+          boxSizing: 'border-box',
+        }}
+      />
+    </Box>
+  );
+});
+
+EditableInput.displayName = 'EditableInput';
+
+const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUpdate }) => {
+  const { isLoggedIn } = useAuth();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState<any>({});
   const [updating, setUpdating] = useState(false);
 
-  const isObject = (value: any): boolean => {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
-  };
+  // Memoized utility functions
+  const utils = useMemo(() => ({
+    isObject: (value: any): boolean => {
+      return value !== null && typeof value === 'object' && !Array.isArray(value);
+    },
+    isArray: (value: any): boolean => {
+      return Array.isArray(value);
+    },
+    isPrimitive: (value: any): boolean => {
+      return value === null || value === undefined ||
+        typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+    },
+    isArrayOfObjects: (arr: any[]): boolean => {
+      return arr.length > 0 && arr.every(item =>
+        item !== null && typeof item === 'object' && !Array.isArray(item)
+      );
+    },
+  }), []);
 
-  const isArray = (value: any): boolean => {
-    return Array.isArray(value);
-  };
+  const { isObject, isArray, isPrimitive, isArrayOfObjects } = utils;
 
-  const isPrimitive = (value: any): boolean => {
-    return !isObject(value) && !isArray(value);
-  };
+  // Memoized max columns calculation
+  const maxColumns = useMemo(() => {
+    if (!isObject(data)) return 2;
 
-  const isArrayOfObjects = (arr: any[]): boolean => {
-    return arr.length > 0 && arr.every(item => isObject(item));
-  };
-
-  const calculateMaxColumns = (obj: any): number => {
     let maxCols = 2;
-    Object.values(obj).forEach((value) => {
+    Object.values(data).forEach((value) => {
       if (isArray(value) && isArrayOfObjects(value as any[])) {
         maxCols = Math.max(maxCols, 1 + 1 + (value as any[]).length);
       } else if (isObject(value) && !isArray(value)) {
@@ -78,104 +138,148 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint }) =>
       }
     });
     return maxCols;
-  };
+  }, [data, isObject, isArray, isArrayOfObjects]);
 
-  const maxColumns = isObject(data) ? calculateMaxColumns(data) : 2;
-
-  const handleEditClick = () => {
+  const handleEditClick = useCallback(() => {
     setIsEditing(true);
     setEditedData(JSON.parse(JSON.stringify(data)));
-  };
+  }, [data]);
 
-  const handleFieldChange = (key: string, value: any) => {
-    setEditedData((prev: any) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
+  // Helper function to set nested value by path
+  const setNestedValue = useCallback((obj: any, path: string, value: any) => {
+    const keys = path.split('.');
+    const lastKey = keys.pop()!;
+    const target = keys.reduce((acc, key) => {
+      // Handle array indices
+      const arrayMatch = key.match(/^(.+)\[(\d+)\]$/);
+      if (arrayMatch) {
+        const [, arrayKey, index] = arrayMatch;
+        return acc[arrayKey][parseInt(index)];
+      }
+      return acc[key];
+    }, obj);
+    target[lastKey] = value;
+  }, []);
 
-  const handleConfirm = async () => {
-    if (!serverUrl || !endpoint) {
-      alert('Server URL or endpoint not configured');
+  const handleFieldChange = useCallback((path: string, value: any) => {
+    setEditedData((prev: any) => {
+      const newData = JSON.parse(JSON.stringify(prev));
+      setNestedValue(newData, path, value);
+      return newData;
+    });
+  }, [setNestedValue]);
+
+  const handleConfirm = useCallback(async () => {
+    if (!endpoint || !onUpdate) {
+      alert('Update function not configured');
       return;
     }
 
     setUpdating(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${serverUrl}/${endpoint}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editedData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update data');
+      const success = await onUpdate(endpoint, editedData);
+      if (success) {
+        setIsEditing(false);
       }
-
-      await dispatch(fetchAllEndpoints()).unwrap();
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error updating data:', error);
-      alert('Failed to update data');
     } finally {
       setUpdating(false);
     }
-  };
+  }, [endpoint, editedData, onUpdate]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setIsEditing(false);
     setEditedData({});
-  };
+  }, []);
 
-  const renderEditableValue = (key: string, value: any): React.ReactNode => {
-    if (isPrimitive(value)) {
-      const currentValue = editedData[key] !== undefined ? editedData[key] : value;
-      return (
-        <TextField
-          size="small"
-          value={currentValue === null ? '' : currentValue}
-          onChange={(e) => handleFieldChange(key, e.target.value)}
-          sx={{
-            fontSize: '0.875rem',
-            '& .MuiInputBase-input': {
-              fontSize: '0.875rem',
-              py: 0.5,
-            },
-            width: '160px', // hoặc một giá trị cố định hợp lý
-          }}
-        />
-      );
-    }
-    return (
-      <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
-        {String(value)}
-      </Typography>
-    );
-  };
+  // Helper to get nested value by path
+  const getNestedValue = useCallback((obj: any, path: string) => {
+    return path.split('.').reduce((acc, key) => {
+      const arrayMatch = key.match(/^(.+)\[(\d+)\]$/);
+      if (arrayMatch) {
+        const [, arrayKey, index] = arrayMatch;
+        return acc[arrayKey]?.[parseInt(index)];
+      }
+      return acc?.[key];
+    }, obj);
+  }, []);
 
-  const renderSimpleValue = (value: any): React.ReactNode => {
-    if (isPrimitive(value)) {
+  const renderEditableValue = useCallback((path: string, value: any): React.ReactNode => {
+    if (!isPrimitive(value)) {
       return (
         <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
-          {value === null ? 'null' : value === undefined ? 'undefined' : String(value)}
+          {String(value)}
         </Typography>
+      );
+    }
+
+    const currentValue = getNestedValue(editedData, path) ?? value;
+    return (
+      <EditableInput
+        fieldKey={path}
+        value={value}
+        currentValue={currentValue}
+        onChange={handleFieldChange}
+      />
+    );
+  }, [editedData, handleFieldChange, isPrimitive, getNestedValue]);
+
+  const renderSimpleValue = useCallback((value: any): React.ReactNode => {
+    if (isPrimitive(value)) {
+      const displayValue = value === null ? 'null' : value === undefined ? 'undefined' : String(value);
+      return (
+        <Box
+          sx={{
+            position: 'relative',
+            minWidth: 'max-content',
+            display: 'inline-block'
+          }}
+        >
+          <Box
+            sx={{
+              fontSize: '0.875rem',
+              lineHeight: '1.43',
+              padding: '2px 4px',
+              minHeight: '20px',
+              border: '1px solid transparent',
+              boxSizing: 'border-box',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {displayValue}
+          </Box>
+        </Box>
       );
     }
     if (isArray(value) && !isArrayOfObjects(value)) {
+      const displayValue = value.map((item: Primitive) => isPrimitive(item) ? String(item) : JSON.stringify(item)).join(', ');
       return (
-        <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
-          {value.map((item: Primitive) => isPrimitive(item) ? String(item) : JSON.stringify(item)).join(', ')}
-        </Typography>
+        <Box
+          sx={{
+            position: 'relative',
+            minWidth: 'max-content',
+            display: 'inline-block'
+          }}
+        >
+          <Box
+            sx={{
+              fontSize: '0.875rem',
+              lineHeight: '1.43',
+              padding: '2px 4px',
+              minHeight: '20px',
+              border: '1px solid transparent',
+              boxSizing: 'border-box',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {displayValue}
+          </Box>
+        </Box>
       );
     }
     return null;
-  };
+  }, [isPrimitive, isArray, isArrayOfObjects]);
 
-  const renderObjectRows = (obj: any, parentKey: string = ''): React.ReactNode[] => {
+  const renderObjectRows = useCallback((obj: any, parentKey: string = ''): React.ReactNode[] => {
     const rows: React.ReactNode[] = [];
     const displayData = isEditing ? editedData : obj;
 
@@ -217,36 +321,41 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint }) =>
               >
                 {propKey}
               </TableCell>
-              {arr.map((item, idx) => (
-                <TableCell
-                  key={idx}
-                  colSpan={idx === arr.length - 1 ? maxColumns - arr.length - 1 : 1}
-                  sx={{
-                    verticalAlign: 'top',
-                    px: 1,
-                    py: 0.5,
-                  }}
-                >
-                  <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
-                    {(() => {
-                      const cellValue = item[propKey];
-                      return cellValue !== undefined
-                        ? (isPrimitive(cellValue)
-                          ? String(cellValue)
-                          : isArray(cellValue) && !isArrayOfObjects(cellValue)
-                            ? cellValue.join(', ')
-                            : JSON.stringify(cellValue))
-                        : '-';
-                    })()}
-                  </Typography>
-                </TableCell>
-              ))}
+              {arr.map((item, idx) => {
+                const cellValue = item[propKey];
+                const cellPath = `${fullKey}[${idx}].${propKey}`;
+
+                return (
+                  <TableCell
+                    key={idx}
+                    colSpan={idx === arr.length - 1 ? maxColumns - arr.length - 1 : 1}
+                    sx={{
+                      verticalAlign: 'top',
+                      px: 1,
+                      py: 0.5,
+                    }}
+                  >
+                    {isEditing && isPrimitive(cellValue) ? (
+                      renderEditableValue(cellPath, cellValue)
+                    ) : (
+                      <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
+                        {cellValue !== undefined
+                          ? (isPrimitive(cellValue)
+                            ? String(cellValue)
+                            : isArray(cellValue) && !isArrayOfObjects(cellValue)
+                              ? cellValue.join(', ')
+                              : JSON.stringify(cellValue))
+                          : '-'}
+                      </Typography>
+                    )}
+                  </TableCell>
+                );
+              })}
             </TableRow>
           );
         });
       }
       else if (isObject(value) && !isArray(value)) {
-        // Skip nested objects in edit mode for simplicity
         if (!isEditing) {
           const allValuesAreObjects = Object.values(value as Record<string, unknown>).every(v => isObject(v) && !isArray(v));
 
@@ -381,8 +490,8 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint }) =>
             <TableCell sx={{ fontWeight: 'bold', verticalAlign: 'middle', textAlign: 'left', fontSize: '0.875rem', px: 1, py: 0.5, whiteSpace: 'nowrap' }}>
               {key}
             </TableCell>
-            <TableCell sx={{ px: 1, py: 0.5 }}>
-              {isEditing && isPrimitive(value) ? renderEditableValue(key, value) : renderSimpleValue(value)}
+            <TableCell sx={{ px: 1, py: 0.5, whiteSpace: 'nowrap', width: isEditing ? '100%' : 'auto' }}>
+              {isEditing && isPrimitive(value) ? renderEditableValue(fullKey, value) : renderSimpleValue(value)}
             </TableCell>
           </TableRow>
         );
@@ -390,11 +499,11 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint }) =>
     });
 
     return rows;
-  };
+  }, [isEditing, editedData, isArray, isArrayOfObjects, isObject, isPrimitive, maxColumns, renderEditableValue, renderSimpleValue]);
 
-  const formatTitle = (str: string): string => {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  };
+  const formattedTitle = useMemo(() =>
+    title ? title.charAt(0).toUpperCase() + title.slice(1) : null,
+    [title]);
 
   if (!isObject(data)) {
     return (
@@ -414,14 +523,13 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint }) =>
 
   return (
     <Box sx={{ position: 'relative', width: 'fit-content', maxWidth: '100%' }}>
-      {/* Table Header with title */}
-      <Box sx={{ mb: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
-        {title && (
+      <Box sx={{ mb: 1, position: 'relative', display: 'flex', alignItems: 'center', minHeight: '32px' }}>
+        {formattedTitle && (
           <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0 }}>
-            {formatTitle(title)}
+            {formattedTitle}
           </Typography>
         )}
-        {isAuthenticated && !isEditing && (
+        {isLoggedIn && !isEditing && (
           <IconButton
             onClick={handleEditClick}
             size="small"
@@ -436,7 +544,6 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint }) =>
         )}
       </Box>
 
-      {/* Table */}
       <TableContainer
         component={Paper}
         sx={{
@@ -493,7 +600,6 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint }) =>
         </Table>
       </TableContainer>
 
-      {/* Cancel / Confirm buttons */}
       {isEditing && (
         <Box
           sx={{
@@ -518,4 +624,4 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint }) =>
   );
 };
 
-export default DynamicTable;
+export default memo(DynamicTable);

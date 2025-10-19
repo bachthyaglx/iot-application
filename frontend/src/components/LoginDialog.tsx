@@ -11,7 +11,8 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { useAppSelector } from '../store/hooks';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { discoverServer, fetchAllEndpoints } from '../store/serverSlice';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LoginDialogProps {
@@ -22,6 +23,7 @@ interface LoginDialogProps {
 const LoginDialog: React.FC<LoginDialogProps> = ({ open, onClose }) => {
   const { serverUrl } = useAppSelector((state) => state.server);
   const { login } = useAuth();
+  const dispatch = useAppDispatch();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -55,12 +57,16 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ open, onClose }) => {
         localStorage.setItem('authToken', data.token);
       }
 
+      // Set context login
+      login();
+
+      // 🔥 Refetch server info and endpoints with new token
+      await dispatch(discoverServer(serverUrl)).unwrap();
+      await dispatch(fetchAllEndpoints()).unwrap();
+
       // Clear form
       setUsername('');
       setPassword('');
-
-      // Set context login
-      login();
 
       // Close dialog
       onClose();

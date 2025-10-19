@@ -1,3 +1,4 @@
+// src/store/serverSlice.ts
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 interface Link {
@@ -47,12 +48,19 @@ const initialState: ServerState = {
   error: null,
 };
 
-// Async thunk để fetch server info
+// Async thunk để fetch server info - WITH AUTH TOKEN
 export const discoverServer = createAsyncThunk(
   'server/discover',
   async (url: string, { rejectWithValue }) => {
     try {
-      const response = await fetch(url);
+      const token = localStorage.getItem('authToken');
+      const headers: HeadersInit = {};
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch server info');
       }
@@ -64,7 +72,7 @@ export const discoverServer = createAsyncThunk(
   }
 );
 
-// Async thunk để fetch tất cả endpoints
+// Async thunk để fetch tất cả endpoints - WITH AUTH TOKEN
 export const fetchAllEndpoints = createAsyncThunk(
   'server/fetchAllEndpoints',
   async (_, { getState, rejectWithValue }) => {
@@ -76,6 +84,13 @@ export const fetchAllEndpoints = createAsyncThunk(
     }
 
     try {
+      const token = localStorage.getItem('authToken');
+      const headers: HeadersInit = {};
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const results: EndpointData = {};
 
       await Promise.all(
@@ -85,7 +100,7 @@ export const fetchAllEndpoints = createAsyncThunk(
 
             // Special handling for /picture endpoint
             if (link.rel === 'picture') {
-              const response = await fetch(fullUrl);
+              const response = await fetch(fullUrl, { headers });
               if (response.ok) {
                 const blob = await response.blob();
                 const objectUrl = URL.createObjectURL(blob);
@@ -104,7 +119,7 @@ export const fetchAllEndpoints = createAsyncThunk(
             } else {
               // JSON endpoints - Only fetch GET methods
               if (link.method === 'GET') {
-                const response = await fetch(fullUrl);
+                const response = await fetch(fullUrl, { headers });
                 if (response.ok) {
                   const data = await response.json();
                   results[link.rel] = {

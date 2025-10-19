@@ -85,9 +85,9 @@ const getRoot = async (req, res) => {
         { href: '/identification', rel: 'identification', method: 'PUT' },
         { href: '/picture', rel: 'picture', method: 'GET' },
         { href: '/picture', rel: 'picture', method: 'PUT' },
-        { href: '/device/ports', rel: 'device-ports', method: 'GET' },
-        { href: '/device/port/{portId}', rel: 'device-port', method: 'GET' },
-        { href: '/device/port/{portId}', rel: 'device-port', method: 'PUT' },
+        { href: '/device/ports', rel: 'ports', method: 'GET' },
+        // { href: '/device/port/{portId}', rel: 'port', method: 'GET' },
+        // { href: '/device/port/{portId}', rel: 'port', method: 'PUT' },
         { href: '/diagnostics', rel: 'diagnostics', method: 'GET' },
         { href: '/diagnostics', rel: 'diagnostics', method: 'PUT' },
         { href: '/diagnostics', rel: 'diagnostics', method: 'DELETE' },
@@ -96,8 +96,8 @@ const getRoot = async (req, res) => {
         { href: '/maintenance', rel: 'maintenance', method: 'GET' },
         { href: '/maintenance', rel: 'maintenance', method: 'PUT' },
         { href: '/maintenance/reboot', rel: 'reboot', method: 'POST' },
-        { href: '/maintenance/factorysettings', rel: 'factory-reset', method: 'POST' },
-        { href: '/maintenance/fwupdate', rel: 'firmware-update', method: 'POST' },
+        { href: '/maintenance/factorysettings', rel: 'factorysettings', method: 'POST' },
+        { href: '/maintenance/fwupdate', rel: 'fwupdate', method: 'POST' },
         // { href: '/data', rel: 'data', method: 'GET' },
         { href: '/logout', rel: 'logout', method: 'POST' }
       ]

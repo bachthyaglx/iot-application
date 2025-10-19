@@ -4,6 +4,7 @@ import { AppBar, Toolbar, Typography, IconButton, Button, Tooltip } from '@mui/m
 import MenuIcon from '@mui/icons-material/Menu';
 import StorageIcon from '@mui/icons-material/Storage';
 import { useAuth } from '../contexts/AuthContext';
+import { useAppSelector } from '../store/hooks';
 import ServerDialog from './ServerDialog';
 import LoginDialog from './LoginDialog';
 
@@ -15,13 +16,14 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onToggleSidebar, sidebarOpen, sidebarWidth }) => {
   const { isLoggedIn, logout } = useAuth();
+  const { serverInfo } = useAppSelector((state) => state.server);
   const [serverDialogOpen, setServerDialogOpen] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
 
-  // Khi click Login/Logout
+  // When click Login/Logout
   const handleLoginClick = () => {
     if (isLoggedIn) {
-      logout(); // Xóa token + set isLoggedIn = false
+      logout(); // Remove Token + set isLoggedIn = false
     } else {
       setLoginDialogOpen(true);
     }
@@ -58,9 +60,12 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, sidebarOpen, sidebarWi
             </IconButton>
           </Tooltip>
 
-          <Button color="inherit" onClick={handleLoginClick}>
-            {isLoggedIn ? 'Logout' : 'Login'}
-          </Button>
+          {/* Login/Logout Button - Only show when server is connected */}
+          {serverInfo && (
+            <Button color="inherit" onClick={handleLoginClick}>
+              {isLoggedIn ? 'Logout' : 'Login'}
+            </Button>
+          )}
         </Toolbar>
       </AppBar>
 
