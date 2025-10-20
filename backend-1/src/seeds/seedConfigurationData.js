@@ -25,6 +25,174 @@ const seedConfiguration = async () => {
       process.exit(1)
     }
 
+    // 🔥 CRITICAL: Create Map for Ports
+    const portsMap = new Map()
+
+    // Define all ports
+    const portsData = {
+      XD1: {
+        type: 'PWRIN',
+        descr: 'M12, L-coded, 4-Pin, male',
+        capabilities: '9 A',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: 'autoneg',
+          speed: 1000000
+        }
+      },
+      XD2: {
+        type: 'PWROUT',
+        descr: 'M12, L-coded, 4-Pin, female',
+        capabilities: '9 A',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: 'autoneg',
+          speed: 1000000
+        }
+      },
+      XF1: {
+        type: 'ETH',
+        descr: 'M12, D-coded, female',
+        capabilities: '100-BaseTX',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: '100FD',
+          speed: 1000000
+        }
+      },
+      XF2: {
+        type: 'ETH',
+        descr: 'M12, D-coded, female',
+        capabilities: '100-BaseTX',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: '100HD',
+          speed: 1000000
+        }
+      },
+      X0: {
+        type: 'IOL',
+        descr: 'M12, A-coded female',
+        capabilities: '100-BaseTX',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: '100FD',
+          speed: 1000000
+        }
+      },
+      X1: {
+        type: 'IOL',
+        descr: 'M12, A-coded, female',
+        capabilities: '100-BaseTX',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: '100FD',
+          speed: 1000000
+        }
+      },
+      X2: {
+        type: 'IOL',
+        descr: 'M12, A-coded, female',
+        capabilities: '100-BaseTX',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: '100FD',
+          speed: 1000000
+        }
+      },
+      X3: {
+        type: 'IOL',
+        descr: 'M12, A-coded, female',
+        capabilities: '100-BaseTX',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: '100FD',
+          speed: 1000000
+        }
+      },
+      X4: {
+        type: 'IOL',
+        descr: 'M12, A-coded, female',
+        capabilities: '100-BaseTX',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: '100FD',
+          speed: 1000000
+        }
+      },
+      X5: {
+        type: 'IOL',
+        descr: 'M12, A-coded, female',
+        capabilities: '100-BaseTX',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: '100FD',
+          speed: 1000000
+        }
+      },
+      X6: {
+        type: 'IOL',
+        descr: 'M12, A-coded, female',
+        capabilities: '100-BaseTX',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: '100FD',
+          speed: 1000000
+        }
+      },
+      X7: {
+        type: 'IOL',
+        descr: 'M12, A-coded, female',
+        capabilities: '100-BaseTX',
+        configuration: {
+          configuration: 'enabled',
+          adminstate: 'enabled'
+        },
+        status: {
+          mode: '100FD',
+          speed: 1000000
+        }
+      }
+    }
+
+    // 🔥 Populate Map
+    Object.entries(portsData).forEach(([key, value]) => {
+      portsMap.set(key, value)
+    })
+
     const configuration = new Configuration({
       Fieldbus: {
         fieldbusStatus: 'connected',
@@ -50,175 +218,7 @@ const seedConfiguration = async () => {
         keepAliveTime: 10
       },
 
-      Ports: {
-        XD1: {
-          type: 'PWRIN',
-          descr: 'M12, L-coded, 4-Pin, male',
-          capabilities: '9 A',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: 'autoneg',
-            speed: 1000000
-          }
-        },
-
-        XD2: {
-          type: 'PWROUT',
-          descr: 'M12, L-coded, 4-Pin, female',
-          capabilities: '9 A',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: 'autoneg',
-            speed: 1000000
-          }
-        },
-
-        XF1: {
-          type: 'ETH',
-          descr: 'M12, D-coded, female',
-          capabilities: '100-BaseTX',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: '100FD',
-            speed: 1000000
-          }
-        },
-
-        XF2: {
-          type: 'ETH',
-          descr: 'M12, D-coded, female',
-          capabilities: '100-BaseTX',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: '100HD',
-            speed: 1000000
-          }
-        },
-
-        X0: {
-          type: 'IOL',
-          descr: 'M12, A-coded female',
-          capabilities: '100-BaseTX',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: '100FD',
-            speed: 1000000
-          }
-        },
-
-        X1: {
-          type: 'IOL',
-          descr: 'M12, A-coded, female',
-          capabilities: '100-BaseTX',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: '100FD',
-            speed: 1000000
-          }
-        },
-
-        X2: {
-          type: 'IOL',
-          descr: 'M12, A-coded, female',
-          capabilities: '100-BaseTX',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: '100FD',
-            speed: 1000000
-          }
-        },
-
-        X3: {
-          type: 'IOL',
-          descr: 'M12, A-coded, female',
-          capabilities: '100-BaseTX',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: '100FD',
-            speed: 1000000
-          }
-        },
-
-        X4: {
-          type: 'IOL',
-          descr: 'M12, A-coded, female',
-          capabilities: '100-BaseTX',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: '100FD',
-            speed: 1000000
-          }
-        },
-
-        X5: {
-          type: 'IOL',
-          descr: 'M12, A-coded, female',
-          capabilities: '100-BaseTX',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: '100FD',
-            speed: 1000000
-          }
-        },
-
-        X6: {
-          type: 'IOL',
-          descr: 'M12, A-coded, female',
-          capabilities: '100-BaseTX',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: '100FD',
-            speed: 1000000
-          }
-        },
-
-        X7: {
-          type: 'IOL',
-          descr: 'M12, A-coded, female',
-          capabilities: '100-BaseTX',
-          configuration: {
-            configuration: 'enabled',
-            adminstate: 'enabled'
-          },
-          status: {
-            mode: '100FD',
-            speed: 1000000
-          }
-        }
-      },
+      Ports: portsMap, // 🔥 Use Map instead of object
 
       JSON: {
         json_configuration: {

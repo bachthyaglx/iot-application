@@ -15,8 +15,6 @@ tags:
     description: Realtime or cached sensor data
   - name: Configuration
     description: Device configuration management
-  - name: Device Ports
-    description: Device port information and configuration
   - name: Diagnostics
     description: Device diagnostics and port statistics
   - name: Maintenance
@@ -175,83 +173,6 @@ paths:
                     type: humidity
         '401':
           description: Unauthorized - missing or invalid token
-  /api/device/port/{portId}:
-    get:
-      summary: Get specific port information
-      description: >-
-        Returns information for a specific port. Data is cached in Redis for
-        performance.
-      tags:
-        - Device Ports
-      parameters:
-        - in: path
-          name: portId
-          required: true
-          schema:
-            type: string
-          description: Port identifier (e.g., XD1, XF1, X0, HMI)
-      responses:
-        '200':
-          description: Port information array with fields and data
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  oneOf:
-                    - type: array
-                      items:
-                        type: string
-                    - type: object
-        '401':
-          description: Unauthorized - Authentication required
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  title:
-                    type: string
-                  detail:
-                    type: string
-                  type:
-                    type: string
-                  status:
-                    type: integer
-        '404':
-          description: Port not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  title:
-                    type: string
-                  detail:
-                    type: string
-                  type:
-                    type: string
-                  status:
-                    type: integer
-        '500':
-          description: Internal server error
-  /api/device/ports:
-    get:
-      summary: Get all ports information
-      description: Returns information for all device ports. Data is cached in Redis.
-      tags:
-        - Device Ports
-      responses:
-        '200':
-          description: Object containing all ports data
-          content:
-            application/json:
-              schema:
-                type: object
-        '401':
-          description: Unauthorized
-        '500':
-          description: Internal server error
   /api/diagnostics:
     get:
       summary: Get device diagnostics

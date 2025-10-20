@@ -25,20 +25,20 @@ const PortConfigurationSchema = new mongoose.Schema({
     },
     content: String
   }
-}, { _id: false })
+}, { _id: false, strict: false })
 
 const PortDataSchema = new mongoose.Schema({
-  type: {
-    type: String,
-    required: true
-  },
+  type: String,
   descr: String,
   capabilities: mongoose.Schema.Types.Mixed, // Can be String or Object
-  configuration: PortConfigurationSchema,
+  configuration: {
+    type: PortConfigurationSchema,
+    default: {}
+  },
   status: mongoose.Schema.Types.Mixed // Can be String or Object
-}, { _id: false })
+}, { _id: false, strict: false })
 
-const DeviceSchema = new mongoose.Schema({
+const PortsSchema = new mongoose.Schema({
   portId: {
     type: String,
     required: true,
@@ -49,7 +49,10 @@ const DeviceSchema = new mongoose.Schema({
     type: [String],
     default: ['type', 'descr', 'capabilities', 'configuration', 'status']
   },
-  data: PortDataSchema,
+  data: {
+    type: PortDataSchema,
+    default: {}
+  },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -58,14 +61,15 @@ const DeviceSchema = new mongoose.Schema({
   timestamps: true
 })
 
-DeviceSchema.set('toJSON', {
+PortsSchema.set('toJSON', {
   transform: (document, returnedObject) => {
     returnedObject.id = returnedObject._id.toString()
     delete returnedObject._id
     delete returnedObject.__v
     delete returnedObject.updatedAt
     delete returnedObject.createdAt
+    delete returnedObject.user
   }
 })
 
-module.exports = mongoose.model('Device', DeviceSchema)
+module.exports = mongoose.model('Ports', PortsSchema)

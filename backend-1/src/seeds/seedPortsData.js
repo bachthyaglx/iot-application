@@ -1,7 +1,7 @@
 /* eslint-disable linebreak-style */
 require('dotenv').config()
 const mongoose = require('mongoose')
-const Device = require('../models/device')
+const Ports = require('../models/ports')
 const User = require('../models/user')
 
 const devicePortsData = [
@@ -263,7 +263,7 @@ const devicePortsData = [
       type: 'HMI',
       descr: 'Rotary Switch',
       capabilities: '000-999',
-      configuration: '',
+      configuration: {}, // 🔥 Changed from '' to {}
       status: '999'
     }
   }
@@ -276,7 +276,7 @@ const seedDevicePorts = async () => {
     await mongoose.connect(process.env.MONGODB_URI)
     console.log('✅ Connected to MongoDB')
 
-    const devicesExist = await Device.exists({})
+    const devicesExist = await Ports.exists({})
     if (devicesExist) {
       console.log('ℹ️  Device ports already exist. Skipping seed.')
       await mongoose.connection.close()
@@ -296,7 +296,7 @@ const seedDevicePorts = async () => {
       user: user._id
     }))
 
-    await Device.insertMany(portsWithUser)
+    await Ports.insertMany(portsWithUser)
     console.log(`✅ ${devicePortsData.length} device ports seeded successfully.`)
 
     await mongoose.connection.close()

@@ -7,19 +7,23 @@ import {
   Button,
   Breadcrumbs,
   Link,
+  // Loại bỏ Grid
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import HomeIcon from '@mui/icons-material/Home';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { fetchAllEndpoints } from '../store/serverSlice';
 import DynamicTable from '../components/DynamicTable';
-import { splitDataIntoTables } from '../utils/splitData';
+import { splitDataIntoTables, TableData } from '../utils/splitData';
 import { excludeFields, COMMON_HIDDEN_FIELDS } from '../utils/dataFilter';
 
 interface DynamicPageProps {
   endpoint: string;
   onBack: () => void;
 }
+
+// Số lượng bảng tối đa trên mỗi hàng
+const TABLES_PER_ROW = 3;
 
 const DynamicPage: React.FC<DynamicPageProps> = ({ endpoint, onBack }) => {
   const dispatch = useAppDispatch();
@@ -78,6 +82,18 @@ const DynamicPage: React.FC<DynamicPageProps> = ({ endpoint, onBack }) => {
     [serverUrl, dispatch]
   );
 
+  // LOGIC: Nhóm các bảng thành các hàng (đã sửa lỗi kiểu dữ liệu)
+  const tableRows = useMemo(() => {
+    return tables.reduce((acc: TableData[][], table: TableData, index) => {
+      const rowIndex = Math.floor(index / TABLES_PER_ROW);
+      if (!acc[rowIndex]) {
+        acc[rowIndex] = [];
+      }
+      acc[rowIndex].push(table);
+      return acc;
+    }, [] as TableData[][]);
+  }, [tables]);
+
   // Early return AFTER all hooks
   if (!currentEndpointData) {
     return (
@@ -130,31 +146,53 @@ const DynamicPage: React.FC<DynamicPageProps> = ({ endpoint, onBack }) => {
         </Typography>
       </Breadcrumbs>
 
-      {/* Content - Display multiple tables */}
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 3, // Space between tables
-        }}
-      >
-        {tables.length > 0 ? (
-          tables.map((table) => (
-            <DynamicTable
-              key={table.key}
-              data={table.data}
-              title={table.title}
-              endpoint={table.endpoint}
-              onUpdate={handleUpdateEndpoint}
-            />
-          ))
-        ) : (
-          <Alert severity="info">
-            No data available for this endpoint
-          </Alert>
-        )}
-      </Box>
+      {/* Content - Display multiple tables using Flexbox */}
+      {tables.length > 0 ? (
+        <Box
+          sx={{
+            // Container chính: căn giữa toàn bộ nội dung
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center', // Căn giữa các hàng theo chiều ngang
+          }}
+        >
+          {tableRows.map((row, rowIndex) => (
+            // Mỗi hàng: sử dụng Flexbox để đặt 3 bảng
+            <Box
+              key={rowIndex}
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'center', // Căn giữa các bảng trong hàng
+                width: '100%',
+                maxWidth: '1300px', // Giới hạn chiều rộng tối đa (ví dụ 3 bảng nhỏ + khoảng trống)
+              }}
+            >
+              {row.map((table) => (
+                <Box
+                  key={table.key}
+                  sx={{
+                    // Thiết lập chiều rộng tương đương 1/3 trừ đi khoảng trống
+                    flexGrow: 1,
+                  }}
+                >
+                  <DynamicTable
+                    data={table.data}
+                    title={table.title}
+                    endpoint={table.endpoint}
+                    onUpdate={handleUpdateEndpoint}
+                  />
+                </Box>
+              ))}
+            </Box>
+          ))}
+        </Box>
+      ) : (
+        <Alert severity="info">
+          No data available for this endpoint
+        </Alert>
+      )}
     </Box>
   );
 };

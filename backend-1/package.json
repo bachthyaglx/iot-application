@@ -25,7 +25,7 @@
     "seed:user": "node --no-deprecation src/seeds/seedUserData.js",
     "seed:identification": "node --no-deprecation src/seeds/seedIdentificationData.js",
     "seed:picture": "node --no-deprecation src/seeds/seedPictureData.js",
-    "seed:device": "node --no-deprecation src/seeds/seedDeviceData.js",
+    "seed:ports": "node --no-deprecation src/seeds/seedPortsData.js",
     "seed:diagnostics": "node --no-deprecation src/seeds/seedDiagnosticsData.js",
     "seed:configuration": "node --no-deprecation src/seeds/seedConfigurationData.js",
     "seed:maintenance": "node --no-deprecation src/seeds/seedMaintenanceData.js"

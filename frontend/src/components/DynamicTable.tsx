@@ -26,29 +26,53 @@ interface DynamicTableProps {
 }
 
 // -----------------------------------------------------------
-// Helper: Tính toán độ rộng Key tối đa (cho các object lồng nhau)
+// THUẬT TOÁN LINH HOẠT: Tính toán độ rộng theo độ dài ký tự
 // -----------------------------------------------------------
-const calculateMaxKeyLength = (obj: any, utils: any): number => {
-  let maxLength = 0;
-  if (!utils.isObject(obj)) return 0;
 
-  const traverse = (current: any) => {
-    Object.keys(current).forEach(key => {
-      maxLength = Math.max(maxLength, key.length);
-      const value = current[key];
-      if (utils.isObject(value) && !utils.isArray(value)) {
-        traverse(value);
-      }
-    });
-  };
-  traverse(obj);
-  const minWidth = 100;
-  return Math.max(minWidth, maxLength * 8 + 16);
+interface Utils {
+  isObject: (value: any) => boolean;
+  isArray: (value: any) => boolean;
+}
+
+/**
+ * Thuật toán tính độ dài ký tự tối đa của Key (cột bên trái) trong một Object.
+ */
+const getMaxKeyLengthMap = (obj: any, utils: Utils, currentPath: string = 'root', map: Map<string, number> = new Map()): Map<string, number> => {
+  if (!utils.isObject(obj)) return map;
+
+  let maxLength = 0;
+
+  Object.keys(obj).forEach(key => {
+    maxLength = Math.max(maxLength, key.length);
+    const value = obj[key];
+
+    if (utils.isObject(value) && !utils.isArray(value)) {
+      getMaxKeyLengthMap(value, utils, key, map);
+    }
+  });
+
+  if (maxLength > 0) {
+    map.set(currentPath, maxLength);
+  }
+
+  return map;
+};
+
+/**
+ * Chuyển đổi độ dài ký tự tối đa thành chuỗi CSS minWidth linh hoạt.
+ */
+const getKeyWidthCss = (length: number): string => {
+  const paddingChars = 2; // Giữ padding char nhỏ (tổng 8px padding ngoài)
+  const minWidthChars = 5;
+
+  const finalLength = Math.max(length + paddingChars, minWidthChars);
+
+  return `calc(${finalLength}ch + 8px)`;
 };
 
 
 // -----------------------------------------------------------
-// EditableInput Component (Unchanged)
+// EditableInput Component (Không đổi)
 // -----------------------------------------------------------
 const EditableInput = memo<{
   fieldKey: string;
@@ -112,6 +136,10 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
   const [editedData, setEditedData] = useState<any>({});
   const [updating, setUpdating] = useState(false);
 
+  const formattedTitle = useMemo(() =>
+    title ? title.charAt(0).toUpperCase() + title.slice(1) : null,
+    [title]);
+
   const utils = useMemo(() => ({
     isObject: (value: any): boolean => {
       return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -132,21 +160,9 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
 
   const { isObject, isArray, isPrimitive, isArrayOfObjects } = utils;
 
-  // -----------------------------------------------------------
-  // Tính toán độ rộng Key tối đa cho Object lồng nhau (Khắc phục lỗi TS Scope)
-  // -----------------------------------------------------------
-  const maxKeyWidthMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!isObject(data)) return map;
-
-    Object.entries(data).forEach(([outerKey, outerValue]) => {
-      if (isObject(outerValue) && !isArray(outerValue)) {
-        const maxWidth = calculateMaxKeyLength(outerValue, utils);
-        map.set(outerKey, `${maxWidth}px`);
-      }
-    });
-    return map;
-  }, [data, isObject, isArray, utils]);
+  const maxKeyLengthMap = useMemo(() => {
+    return getMaxKeyLengthMap(data, utils);
+  }, [data, utils]);
 
   const handleEditClick = useCallback(() => {
     setIsEditing(true);
@@ -273,174 +289,104 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
     return null;
   }, [isPrimitive, isArray, isArrayOfObjects]);
 
-  // -----------------------------------------------------------
-  // RENDER ARRAY OF OBJECTS (Bảng Chi tiết)
-  // -----------------------------------------------------------
-  const renderArrayOfObjectsTable = useCallback((arr: any[], arrayKey: string): React.ReactNode => {
-    if (arr.length === 0) {
-      return (
-        <TableRow>
-          <TableCell colSpan={10}>
-            <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
-              No data available for {arrayKey}.
-            </Typography>
-          </TableCell>
-        </TableRow>
-      );
-    }
-
-    const allKeys = Array.from(new Set(arr.flatMap(obj => Object.keys(obj))));
-
-    return (
-      <TableContainer component={Box} sx={{ mt: 1, mb: 1 }}>
-        <Table size="small" sx={{
-          border: '1px solid rgba(224, 224, 224, 1)',
-          '& .MuiTableCell-root': {
-            borderRight: '1px solid rgba(224, 224, 224, 1)',
-            borderBottom: '1px solid rgba(224, 224, 224, 1)',
-            '&:last-child': { borderRight: 'none' },
-          },
-          '& .MuiTableRow-root:last-child .MuiTableCell-root': {
-            borderBottom: 'none',
-          },
-        }}>
-          <TableHead>
-            <TableRow>
-              {allKeys.map(key => (
-                <TableCell key={key} sx={{ fontWeight: 'bold', fontSize: '0.875rem', py: 0.5, verticalAlign: 'middle' }}>
-                  {key.charAt(0).toUpperCase() + key.slice(1)}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {arr.map((item, index) => (
-              <TableRow key={index}>
-                {allKeys.map(key => {
-                  const cellPath = `${arrayKey}[${index}].${key}`;
-                  const cellValue = item[key];
-
-                  return (
-                    <TableCell key={key} sx={{ verticalAlign: 'middle', py: 0.5 }}>
-                      {isEditing && isPrimitive(cellValue) ? (
-                        renderEditableValue(cellPath, cellValue)
-                      ) : (
-                        renderSimpleValue(cellValue) || (
-                          <Box sx={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
-                            {JSON.stringify(cellValue, null, 2)}
-                          </Box>
-                        )
-                      )}
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
-  }, [isEditing, isPrimitive, renderEditableValue, renderSimpleValue]);
-
   /**
-   * Hàm render object lồng nhau sử dụng Flexbox để kiểm soát border/width tốt hơn.
+   * Hàm render object lồng nhau sử dụng Flexbox
    */
-  const renderNestedObject = useCallback((obj: any, fullKey: string, isLastParentRow: boolean, keyWidth: string): React.ReactNode => {
+  const renderNestedObject = useCallback((obj: any, fullKey: string, isLastParentRow: boolean, currentParentKey: string): React.ReactNode => {
     const entries = Object.entries(obj);
 
+    const maxLength = maxKeyLengthMap.get(currentParentKey) || 12; // Mặc định 12 ký tự
+    const finalKeyWidth = getKeyWidthCss(maxLength);
+
+    // Padding chuẩn cho Box lồng nhau
+    const pxValue = 1;
+
     return (
-      <Box sx={{ width: '100%', borderLeft: '1px solid rgba(224, 224, 224, 1)' }}>
+      <Box
+        sx={{
+          width: '100%',
+          // SỬA ĐỔI: Loại bỏ viền trái thừa ở đây (đã có viền phải của TableCell cha)
+          // borderLeft: '1px solid rgba(224, 224, 224, 1)', 
+        }}
+      >
         {entries.map(([subKey, subValue], index) => {
           const subPath = `${fullKey}.${subKey}`;
           const isLastItem = index === entries.length - 1;
           const nextIsLastParentRow = isLastParentRow && isLastItem;
 
-          if (isObject(subValue) && !isArray(subValue)) {
-            // Object lồng nhau -> recursive call
-            return (
-              <Box
-                key={subKey}
-                sx={{
-                  display: 'flex',
-                  // KHẮC PHỤC DOUBLE BORDER: Bỏ border dưới nếu là hàng cuối cùng của toàn bộ cấu trúc lồng nhau (nextIsLastParentRow)
-                  borderBottom: nextIsLastParentRow ? 'none' : '1px solid rgba(224, 224, 224, 1)',
-                }}
-              >
-                {/* Key Column */}
-                <Box
-                  sx={{
-                    fontWeight: 500,
-                    fontSize: '0.875rem',
-                    px: 1,
-                    py: 0.5,
-                    whiteSpace: 'normal',
-                    wordBreak: 'break-word',
-                    width: keyWidth,
-                    minWidth: keyWidth,
-                    borderRight: '1px solid rgba(224, 224, 224, 1)',
-                    display: 'flex',
-                    alignItems: 'center', // Căn giữa dọc
-                  }}
-                >
-                  {subKey}
-                </Box>
-                {/* Value Column (chứa object lồng) */}
-                <Box sx={{ flexGrow: 1, padding: 0 }}>
-                  {renderNestedObject(subValue, subPath, nextIsLastParentRow, keyWidth)}
-                </Box>
-              </Box>
-            );
-          }
+          const isContentValue = subKey === 'content';
+          const isNested = isObject(subValue) && !isArray(subValue);
 
-          // Primitive value
+          // Cột Key
+          const keyBox = (
+            <Box
+              sx={{
+                fontWeight: 500,
+                fontSize: '0.875rem',
+                px: pxValue,
+                py: 0.5,
+                whiteSpace: 'normal',
+                wordBreak: 'break-word',
+                flex: `0 0 ${finalKeyWidth}`,
+                minWidth: finalKeyWidth,
+                maxWidth: '300px',
+                // SỬA ĐỔI: Viền dọc giữa Key và Value Box
+                borderRight: '1px solid rgba(224, 224, 224, 1)',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              {subKey}
+            </Box>
+          );
+
+          // Cột Value
+          const valueBox = isNested ? (
+            <Box sx={{ flexGrow: 1, padding: 0 }}>
+              {renderNestedObject(subValue, subPath, nextIsLastParentRow, subKey)}
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                flexGrow: 1,
+                flexShrink: 1,
+                minWidth: isContentValue ? '200px' : '100px',
+                wordBreak: isContentValue ? 'break-all' : 'break-word',
+                px: pxValue,
+                py: 0.5,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              {isEditing && isPrimitive(subValue) ?
+                renderEditableValue(subPath, subValue) :
+                renderSimpleValue(subValue) || (
+                  <Box sx={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
+                    {JSON.stringify(subValue, null, 2)}
+                  </Box>
+                )
+              }
+            </Box>
+          );
+
           return (
             <Box
               key={subKey}
               sx={{
                 display: 'flex',
-                // KHẮC PHỤC DOUBLE BORDER: Bỏ border dưới nếu là hàng cuối cùng của toàn bộ cấu trúc lồng nhau (nextIsLastParentRow)
+                width: '100%',
+                // SỬA ĐỔI: Quản lý viền dưới
                 borderBottom: nextIsLastParentRow ? 'none' : '1px solid rgba(224, 224, 224, 1)',
               }}
             >
-              {/* Key Column */}
-              <Box
-                sx={{
-                  fontWeight: 500,
-                  fontSize: '0.875rem',
-                  px: 1,
-                  py: 0.5,
-                  whiteSpace: 'normal',
-                  wordBreak: 'break-word',
-                  width: keyWidth, // Áp dụng width tối đa
-                  minWidth: keyWidth,
-                  borderRight: '1px solid rgba(224, 224, 224, 1)',
-                  display: 'flex',
-                  alignItems: 'center', // Căn giữa dọc
-                }}
-              >
-                {subKey}
-              </Box>
-              {/* Value Column */}
-              <Box
-                sx={{
-                  flexGrow: 1,
-                  px: 1,
-                  py: 0.5,
-                  display: 'flex',
-                  alignItems: 'center', // Căn giữa dọc
-                }}
-              >
-                {isEditing && isPrimitive(subValue) ?
-                  renderEditableValue(subPath, subValue) :
-                  renderSimpleValue(subValue)
-                }
-              </Box>
+              {keyBox}
+              {valueBox}
             </Box>
           );
         })}
       </Box>
     );
-  }, [isObject, isArray, isPrimitive, isEditing, renderEditableValue, renderSimpleValue]);
+  }, [isObject, isArray, isPrimitive, isEditing, renderEditableValue, renderSimpleValue, maxKeyLengthMap]);
 
 
   const renderObjectRows = useCallback((obj: any): React.ReactNode[] => {
@@ -449,99 +395,217 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
     const keys = Object.keys(displayData);
     const totalKeys = keys.length;
 
+    const isPortsCollection = formattedTitle === 'Ports';
+    const rootKeyWidth = getKeyWidthCss(maxKeyLengthMap.get('root') || 10);
+
+    const tableCellPxValue = 1;
+
+    // ----------------------------------------------------------
+    // TÍNH TOÁN CỘT WIDTH CHO TRƯỜNG HỢP KHÔNG PHẢI PORTS/ARRAY (Mặc định là Root Key Width)
+    // ----------------------------------------------------------
+    const defaultKeyWidth = rootKeyWidth;
+
     keys.forEach((key, index) => {
       const value = displayData[key];
       const fullKey = key;
       const isLastKey = index === totalKeys - 1;
 
-      const currentKeyWidth = maxKeyWidthMap.get(key) || '100px';
+      // ----------------------------------------------------------
+      // TRƯỜNG HỢP 1: PORTS COLLECTION (Xử lý 3 cột)
+      // ----------------------------------------------------------
+      if (isPortsCollection) {
+        // --- (Logic này KHÔNG được lặp lại trong forEach keys nếu isPortsCollection là true)
+        // Vì logic Ports Collection nên xử lý TOÀN BỘ dữ liệu. 
+        // Logic này chỉ cần chạy MỘT LẦN cho toàn bộ `data` nếu `isPortsCollection` là true.
+        // Tuy nhiên, vì cấu trúc code hiện tại lặp qua `keys` của data, ta sẽ giữ lại
+        // và đảm bảo nó xử lý tất cả các port.
 
-      // TH1: Array of Objects (render bảng riêng)
+        // Ta chỉ cần xử lý Ports Collection trong vòng lặp đầu tiên nếu nó được kích hoạt
+        if (index === 0) {
+          keys.forEach((parentKey, parentIndex) => {
+            const parentValue = displayData[parentKey];
+            if (!isObject(parentValue) || isArray(parentValue)) return;
+
+            const childEntries = Object.entries(parentValue);
+            const isLastParent = parentIndex === totalKeys - 1;
+
+            childEntries.forEach(([childKey, childValue], childIndex) => {
+              const isFirstChild = childIndex === 0;
+              const isLastChild = childIndex === childEntries.length - 1;
+              const fullPath = `${parentKey}.${childKey}`;
+
+              const attributeKeyWidth = getKeyWidthCss(maxKeyLengthMap.get(parentKey) || 12);
+
+              rows.push(
+                <TableRow key={fullPath}>
+                  {/* CỘT 1: Port Name (Parent Key) */}
+                  {isFirstChild && (
+                    <TableCell
+                      rowSpan={childEntries.length}
+                      sx={{
+                        fontWeight: 'bold',
+                        verticalAlign: 'middle',
+                        textAlign: 'left',
+                        fontSize: '0.875rem',
+                        px: tableCellPxValue,
+                        py: 0.5,
+                        whiteSpace: 'nowrap',
+                        borderRight: '1px solid rgba(224, 224, 224, 1)',
+                        minWidth: '100px',
+                      }}
+                    >
+                      {parentKey}
+                    </TableCell>
+                  )}
+
+                  {/* CỘT 2: Attribute Key (Child Key) */}
+                  <TableCell
+                    sx={{
+                      fontWeight: 500,
+                      verticalAlign: 'middle',
+                      textAlign: 'left',
+                      fontSize: '0.875rem',
+                      px: tableCellPxValue,
+                      py: 0.5,
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                      minWidth: attributeKeyWidth,
+                      maxWidth: '300px',
+                      borderRight: '1px solid rgba(224, 224, 224, 1)',
+                    }}
+                  >
+                    {childKey}
+                  </TableCell>
+
+                  {/* CỘT 3: Value */}
+                  <TableCell
+                    sx={{
+                      px: 0, // Padding 0 vì nội dung lồng nhau đã có padding
+                      py: 0,
+                      verticalAlign: 'middle',
+                      // Viền dưới: Chỉ áp dụng cho hàng cuối cùng của toàn bộ bảng
+                      borderBottom: (isLastParent && isLastChild) ? 'none' : '1px solid rgba(224, 224, 224, 1)',
+                      width: '100%',
+                    }}
+                  >
+                    {isObject(childValue) && !isArray(childValue) ? (
+                      renderNestedObject(childValue, fullPath, isLastParent && isLastChild, childKey)
+                    ) : isEditing && isPrimitive(childValue) ? (
+                      <Box sx={{ px: tableCellPxValue, py: 0.5 }}>
+                        {renderEditableValue(fullPath, childValue)}
+                      </Box>
+                    ) : (
+                      <Box sx={{ px: tableCellPxValue, py: 0.5 }}>
+                        {renderSimpleValue(childValue) || (
+                          <Box sx={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
+                            {JSON.stringify(childValue, null, 2)}
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            });
+          });
+          return rows;
+        }
+        // Vì logic Ports Collection đã return rows ở đây, không cần quan tâm đến các trường hợp khác.
+        // Ta chỉ cần return rows cuối cùng.
+        return rows;
+      }
+
+      // ----------------------------------------------------------
+      // TRƯỜNG HỢP 2 & 3: ARRAY OF OBJECTS, OBJECT LỒNG, PRIMITIVE
+      // ----------------------------------------------------------
+
       if (isArray(value) && isArrayOfObjects(value as any[])) {
+        // [Logic Array of Objects]
+        const arr = value as any[];
+        if (arr.length === 0) {
+          rows.push(
+            <TableRow key={fullKey}>
+              <TableCell sx={{ fontWeight: 'bold', fontSize: '0.875rem', px: tableCellPxValue, py: 0.5, verticalAlign: 'middle', textAlign: 'left' }}>
+                {key}
+              </TableCell>
+              <TableCell colSpan={100}>
+                <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
+                  No data available.
+                </Typography>
+              </TableCell>
+            </TableRow>
+          );
+        } else {
+          const allKeys = Array.from(new Set(arr.flatMap(obj => Object.keys(obj))));
+          rows.push(
+            <TableRow key={`${fullKey}-header`}>
+              <TableCell rowSpan={arr.length + 1} sx={{ fontWeight: 'bold', fontSize: '0.875rem', px: tableCellPxValue, py: 0.5, verticalAlign: 'middle', textAlign: 'left', borderRight: '1px solid rgba(224, 224, 224, 1)', }}>
+                {key}
+              </TableCell>
+              {allKeys.map(objKey => (<TableCell key={objKey} sx={{ fontWeight: 'bold', fontSize: '0.875rem', px: tableCellPxValue, py: 0.5, verticalAlign: 'middle', borderRight: '1px solid rgba(224, 224, 224, 1)', '&:last-child': { borderRight: 'none' } }}>
+                {objKey.charAt(0).toUpperCase() + objKey.slice(1)}
+              </TableCell>))}
+            </TableRow>
+          );
+          arr.forEach((item, itemIndex) => {
+            rows.push(
+              <TableRow key={`${fullKey}-${itemIndex}`}>
+                {allKeys.map(objKey => {
+                  const cellPath = `${fullKey}[${itemIndex}].${objKey}`;
+                  const cellValue = item[objKey];
+                  return (
+                    <TableCell key={objKey} sx={{ px: tableCellPxValue, py: 0.5, verticalAlign: 'middle', borderRight: '1px solid rgba(224, 224, 224, 1)', '&:last-child': { borderRight: 'none' } }}>
+                      {isEditing && isPrimitive(cellValue) ? renderEditableValue(cellPath, cellValue) : renderSimpleValue(cellValue) || (<Box sx={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>{JSON.stringify(cellValue, null, 2)}</Box>)}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            );
+          });
+        }
+      }
+      else {
+        // Object lồng nhau hoặc Primitive
         rows.push(
           <TableRow key={fullKey}>
             <TableCell
-              colSpan={2}
               sx={{
                 fontWeight: 'bold',
                 verticalAlign: 'middle',
                 textAlign: 'left',
                 fontSize: '0.875rem',
-                px: 1,
+                px: tableCellPxValue,
                 py: 0.5,
                 whiteSpace: 'nowrap',
-                borderBottom: isLastKey ? 'none' : '1px solid rgba(224, 224, 224, 1)',
-              }}
-            >
-              {key}
-              {renderArrayOfObjectsTable(value as any[], fullKey)}
-            </TableCell>
-          </TableRow>
-        );
-      }
-      // TH2: Object lồng nhau (Sử dụng Flexbox)
-      else if (isObject(value) && !isArray(value)) {
-        rows.push(
-          <TableRow key={fullKey}>
-            <TableCell
-              sx={{
-                fontWeight: 'bold',
-                verticalAlign: 'middle',
-                textAlign: 'center',
-                fontSize: '0.875rem',
-                px: 1,
-                py: 0.5,
-                whiteSpace: 'nowrap',
+                minWidth: defaultKeyWidth, // Áp dụng width
               }}
             >
               {key}
             </TableCell>
             <TableCell
               sx={{
-                padding: 0,
+                padding: isObject(value) && !isArray(value) ? 0 : `${tableCellPxValue * 4}px ${tableCellPxValue * 4}px`, // Padding cho Primitive: 4px*4px
                 borderRight: 'none',
-                borderBottom: 'none',
+                borderBottom: isObject(value) && !isArray(value) ? 'none' : (isLastKey ? 'none' : '1px solid rgba(224, 224, 224, 1)'),
+                width: '100%',
               }}
             >
-              {renderNestedObject(value, fullKey, isLastKey, currentKeyWidth)}
-            </TableCell>
-          </TableRow>
-        );
-      }
-      // TH3: Primitive Value
-      else {
-        rows.push(
-          <TableRow key={fullKey}>
-            <TableCell
-              sx={{
-                fontWeight: 'bold',
-                verticalAlign: 'middle',
-                textAlign: 'center',
-                fontSize: '0.875rem',
-                px: 1,
-                py: 0.5,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {key}
-            </TableCell>
-            <TableCell
-              sx={{
-                px: 1,
-                py: 0.5,
-                verticalAlign: 'middle',
-                // Kiểm soát border dưới: Bỏ nếu là key cuối cùng
-                borderBottom: isLastKey ? 'none' : '1px solid rgba(224, 224, 224, 1)',
-              }}
-            >
-              {isEditing && isPrimitive(value) ?
-                renderEditableValue(fullKey, value) :
-                isPrimitive(value) ?
-                  renderSimpleValue(value) :
-                  <Box sx={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
-                    {JSON.stringify(value, null, 2)}
-                  </Box>
-              }
+              {isObject(value) && !isArray(value) ? (
+                // Object lồng nhau -> Dùng renderNestedObject
+                renderNestedObject(value, fullKey, isLastKey, key)
+              ) : (
+                // Primitive hoặc Array of Primitives -> Render trực tiếp
+                <Box sx={{ px: 0, py: 0 }}> {/* Đã có padding ở TableCell cha */}
+                  {isEditing && isPrimitive(value) ?
+                    renderEditableValue(fullKey, value) :
+                    renderSimpleValue(value) || (
+                      <Box sx={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
+                        {JSON.stringify(value, null, 2)}
+                      </Box>
+                    )
+                  }
+                </Box>
+              )}
             </TableCell>
           </TableRow>
         );
@@ -549,57 +613,22 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
     });
 
     return rows;
-  }, [isEditing, editedData, isArray, isArrayOfObjects, isObject, isPrimitive, renderEditableValue, renderSimpleValue, renderNestedObject, renderArrayOfObjectsTable, maxKeyWidthMap]);
-
-  const formattedTitle = useMemo(() =>
-    title ? title.charAt(0).toUpperCase() + title.slice(1) : null,
-    [title]);
+  }, [isEditing, editedData, formattedTitle, isArray, isArrayOfObjects, isObject, isPrimitive, renderEditableValue, renderSimpleValue, renderNestedObject, maxKeyLengthMap]);
 
   // Logic kiểm tra nếu data là Array of Objects (như PortStatistics)
   const isTopLevelArray = isArray(data) && isArrayOfObjects(data as any[]);
+  // Logic kiểm tra Ports Collection (dùng title đã được chuẩn hóa)
+  const isPortsCollection = formattedTitle === 'Ports';
 
-  if (!isObject(data) && !isTopLevelArray) {
-    return (
-      <TableContainer component={Paper}>
-        <Table>
-          <TableBody>
-            <TableRow>
-              <TableCell>
-                <Typography color="error">Invalid data: Expected an object or Array of Objects</Typography>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
-  }
+  const rootKeyWidthCss = getKeyWidthCss(maxKeyLengthMap.get('root') || 10);
+  const tableCellPxValue = 1; // Giá trị px chuẩn
 
-  // -----------------------------------------------------------
-  // JSX chính
-  // -----------------------------------------------------------
-  if (isTopLevelArray) {
-    return (
-      <Box sx={{ position: 'relative', width: '100%' }}>
-        {formattedTitle && (
-          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-            {formattedTitle}
-          </Typography>
-        )}
-        {renderArrayOfObjectsTable(data as any[], title || 'Data')}
-      </Box>
-    );
-  }
+  // ... (Phần JSX còn lại không đổi)
 
-  // JSX cho Object chính
   return (
     <Box sx={{ position: 'relative', width: 'fit-content', maxWidth: '100%' }}>
-      <Box sx={{ mb: 1, position: 'relative', display: 'flex', alignItems: 'center', minHeight: '32px' }}>
-        {formattedTitle && (
-          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0 }}>
-            {formattedTitle}
-          </Typography>
-        )}
-        {isLoggedIn && !isEditing && (
+      {isLoggedIn && !isEditing && formattedTitle && (
+        <Box sx={{ mb: 1, position: 'relative', display: 'flex', alignItems: 'center', minHeight: '32px' }}>
           <IconButton
             onClick={handleEditClick}
             size="small"
@@ -611,8 +640,8 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
           >
             <EditIcon fontSize="small" />
           </IconButton>
-        )}
-      </Box>
+        </Box>
+      )}
 
       <TableContainer
         component={Paper}
@@ -629,45 +658,90 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
           sx={{
             tableLayout: 'auto',
             width: '100%',
-            // Đặt border cho các cell của bảng chính
             '& .MuiTableCell-root': {
               borderRight: '1px solid rgba(224, 224, 224, 1)',
               borderBottom: '1px solid rgba(224, 224, 224, 1)',
               '&:last-child': { borderRight: 'none' },
             },
-            // Loại bỏ border dưới cho hàng cuối cùng của bảng chính
-            '& .MuiTableRow-root:last-child .MuiTableCell-root': {
-              borderBottom: 'none',
-            },
           }}
         >
-          <TableBody>
+          <TableHead>
             <TableRow>
+              {isPortsCollection && (
+                <TableCell
+                  sx={{
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    verticalAlign: 'middle',
+                    fontSize: '0.875rem',
+                    px: tableCellPxValue,
+                    py: 0.5,
+                    borderRight: '1px solid rgba(224, 224, 224, 1)',
+                    minWidth: rootKeyWidthCss, // Áp dụng width root
+                  }}
+                >
+                  Port Name
+                </TableCell>
+              )}
               <TableCell
+                colSpan={isPortsCollection ? 2 : 100}
                 sx={{
                   fontWeight: 'bold',
-                  verticalAlign: 'middle',
-                  textAlign: 'center',
-                  fontSize: '0.875rem',
-                  px: 1,
-                  py: 0.5,
-                  width: '1%',
-                }}
-              />
-              <TableCell
-                sx={{
-                  fontWeight: 'bold',
                   textAlign: 'center',
                   verticalAlign: 'middle',
                   fontSize: '0.875rem',
-                  px: 1,
+                  px: tableCellPxValue,
                   py: 0.5,
-                  width: '100%',
                 }}
               >
-                Data
+                {formattedTitle || 'Data'}
               </TableCell>
             </TableRow>
+            {isPortsCollection && (
+              <TableRow>
+                {/* Cell trống cho cột Port Name */}
+                <TableCell
+                  sx={{
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    verticalAlign: 'middle',
+                    fontSize: '0.875rem',
+                    px: tableCellPxValue,
+                    py: 0.5,
+                  }}
+                >
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    verticalAlign: 'middle',
+                    fontSize: '0.875rem',
+                    px: tableCellPxValue,
+                    py: 0.5,
+                    borderRight: '1px solid rgba(224, 224, 224, 1)',
+                    minWidth: getKeyWidthCss(maxKeyLengthMap.get('root') || 12), // Áp dụng width Attribute (Key cấp 2)
+                    maxWidth: '300px',
+                  }}
+                >
+                  Attribute
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    verticalAlign: 'middle',
+                    fontSize: '0.875rem',
+                    px: tableCellPxValue,
+                    py: 0.5,
+                  }}
+                >
+                  Value
+                </TableCell>
+              </TableRow>
+            )}
+          </TableHead>
+          <TableBody>
             {renderObjectRows(data)}
           </TableBody>
         </Table>
@@ -697,4 +771,5 @@ const DynamicTable: React.FC<DynamicTableProps> = ({ data, title, endpoint, onUp
   );
 };
 
-export default memo(DynamicTable);
+// Export không dùng memo để tránh lỗi TypeScript
+export default DynamicTable;
